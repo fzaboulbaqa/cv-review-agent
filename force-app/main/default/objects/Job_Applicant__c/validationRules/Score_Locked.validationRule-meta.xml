@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Score_Locked</fullName>
+    <active>true</active>
+    <description>An applicant is scored once: bookmarks show the score through a formula, so changing it would change what the recruiter saved</description>
+    <errorConditionFormula>NOT(ISNEW()) &amp;&amp; ISCHANGED(Score__c) &amp;&amp; NOT(ISBLANK(PRIORVALUE(Score__c)))</errorConditionFormula>
+    <errorDisplayField>Score__c</errorDisplayField>
+    <errorMessage>The score can&apos;t be changed once set.</errorMessage>
+</ValidationRule>

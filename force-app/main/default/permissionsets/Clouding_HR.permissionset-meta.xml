@@ -4,6 +4,10 @@
         <application>Clouding_HR</application>
         <visible>true</visible>
     </applicationVisibilities>
+    <classAccesses>
+        <apexClass>ScoringService</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
     <description>Access to the Clouding HR app and its objects</description>
     <fieldPermissions>
         <editable>false</editable>
