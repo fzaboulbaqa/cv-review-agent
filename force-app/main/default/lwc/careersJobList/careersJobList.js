@@ -157,8 +157,9 @@ export default class CareersJobList extends NavigationMixin(LightningElement) {
   }
 
   get sections() {
-    const chevron = (open) =>
-      open ? "utility:chevronup" : "utility:chevrondown";
+    const chevron = (open) => {
+      return open ? "utility:chevronup" : "utility:chevrondown";
+    };
     return {
       location: {
         open: this.openSections.location,
