@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomApplication xmlns="http://soap.sforce.com/2006/04/metadata">
+    <brand>
+        <headerColor>#0070D2</headerColor>
+        <shouldOverrideOrgTheme>false</shouldOverrideOrgTheme>
+    </brand>
+    <description>Recruiting app: candidates, jobs and CV review</description>
+    <formFactors>Small</formFactors>
+    <formFactors>Large</formFactors>
+    <isNavAutoTempTabsDisabled>false</isNavAutoTempTabsDisabled>
+    <isNavPersonalizationDisabled>false</isNavPersonalizationDisabled>
+    <isNavTabPersistenceDisabled>false</isNavTabPersistenceDisabled>
+    <isOmniPinnedViewEnabled>false</isOmniPinnedViewEnabled>
+    <label>Clouding HR</label>
+    <navType>Standard</navType>
+    <tabs>Candidate__c</tabs>
+    <tabs>Job__c</tabs>
+    <tabs>Job_Applicant__c</tabs>
+    <tabs>Bookmark__c</tabs>
+    <tabs>Skill__c</tabs>
+    <uiType>Lightning</uiType>
+</CustomApplication>
