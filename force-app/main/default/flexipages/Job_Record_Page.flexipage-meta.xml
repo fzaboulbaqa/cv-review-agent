@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0" encoding="UTF-8" ?>
 <FlexiPage xmlns="http://soap.sforce.com/2006/04/metadata">
     <flexiPageRegions>
         <itemInstances>
@@ -19,6 +19,16 @@
         <type>Region</type>
     </flexiPageRegions>
     <flexiPageRegions>
+        <itemInstances>
+            <componentInstance>
+                <componentInstanceProperties>
+                    <name>pageSize</name>
+                    <value>6</value>
+                </componentInstanceProperties>
+                <componentName>c:jobApplicants</componentName>
+                <identifier>c_jobApplicants</identifier>
+            </componentInstance>
+        </itemInstances>
         <itemInstances>
             <componentInstance>
                 <componentName>force:detailPanel</componentName>

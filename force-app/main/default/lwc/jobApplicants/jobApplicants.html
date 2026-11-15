@@ -1,0 +1,57 @@
+<template>
+  <lightning-card title={title} icon-name="standard:user">
+    <lightning-button-icon
+      slot="actions"
+      icon-name="utility:refresh"
+      alternative-text="Refresh applicants"
+      title="Refresh"
+      onclick={handleRefresh}
+    ></lightning-button-icon>
+
+    <div class="slds-card__body_inner">
+      <template lwc:if={error}>
+        <p class="slds-text-color_error" role="alert" data-id="error">
+          The applicants could not be loaded: {error}
+        </p>
+      </template>
+
+      <template lwc:if={isEmpty}>
+        <p class="slds-text-color_weak" data-id="empty">
+          No applicants for this job yet.
+        </p>
+      </template>
+
+      <ul class="slds-grid slds-wrap slds-gutters_small">
+        <template for:each={applicants} for:item="applicant">
+          <li
+            key={applicant.applicantId}
+            class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2 slds-m-bottom_small"
+            data-id="applicant"
+          >
+            <c-candidate-card candidate={applicant}></c-candidate-card>
+          </li>
+        </template>
+      </ul>
+
+      <template lwc:if={isLoading}>
+        <div class="slds-is-relative loading">
+          <lightning-spinner
+            alternative-text="Loading applicants"
+            size="small"
+          ></lightning-spinner>
+        </div>
+      </template>
+
+      <template lwc:if={hasMore}>
+        <div class="slds-align_absolute-center slds-m-top_small">
+          <lightning-button
+            label={showMoreLabel}
+            onclick={handleShowMore}
+            disabled={isLoading}
+            data-id="show-more"
+          ></lightning-button>
+        </div>
+      </template>
+    </div>
+  </lightning-card>
+</template>

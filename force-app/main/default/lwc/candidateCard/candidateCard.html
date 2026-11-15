@@ -1,0 +1,129 @@
+<template>
+  <article class="candidate-card">
+    <template lwc:if={isLoading}>
+      <lightning-spinner
+        alternative-text="Loading candidate card"
+        size="small"
+      ></lightning-spinner>
+    </template>
+
+    <template lwc:if={error}>
+      <p class="slds-text-color_error" role="alert" data-id="error">
+        The candidate card could not be loaded: {error}
+      </p>
+    </template>
+
+    <template lwc:elseif={view}>
+      <div class="slds-grid slds-grid_vertical-align-center">
+        <template lwc:if={view.photoUrl}>
+          <img
+            class="photo"
+            src={view.photoUrl}
+            alt={view.photoAlt}
+            data-id="photo"
+          />
+        </template>
+        <template lwc:else>
+          <abbr class="photo initials" title={view.name} data-id="initials"
+            >{view.initials}</abbr
+          >
+        </template>
+
+        <div class="slds-col slds-m-left_small identity">
+          <template lwc:if={isRecordPage}>
+            <h2 class="slds-text-heading_small name" data-id="name">
+              {view.name}
+            </h2>
+          </template>
+          <template lwc:else>
+            <a
+              href="#"
+              class="slds-text-heading_small name"
+              data-id={view.candidateId}
+              onclick={openRecord}
+              >{view.name}</a
+            >
+          </template>
+          <p class="slds-text-color_weak slds-truncate" title={view.subtitle}>
+            {view.subtitle}
+          </p>
+          <p class={view.yearsClass} data-id="years">{view.years}</p>
+        </div>
+
+        <template lwc:if={view.hasApplication}>
+          <div class="score-holder" title={view.levelLabel} data-id="score">
+            <lightning-badge
+              label={view.scoreLabel}
+              class={view.badgeClass}
+            ></lightning-badge>
+            <p class="slds-text-body_small slds-text-color_weak">
+              {view.levelLabel}
+            </p>
+          </div>
+        </template>
+      </div>
+
+      <div class="slds-m-top_x-small chips" data-id="skills">
+        <template lwc:if={view.hasSkills}>
+          <template for:each={view.shownSkills} for:item="skill">
+            <lightning-badge key={skill} label={skill}></lightning-badge>
+          </template>
+          <template lwc:if={view.extraSkillsLabel}>
+            <lightning-badge
+              label={view.extraSkillsLabel}
+              class="slds-badge_lightest"
+            ></lightning-badge>
+          </template>
+        </template>
+        <template lwc:else>
+          <span class="slds-text-body_small missing"
+            >No skills found in CV</span
+          >
+        </template>
+      </div>
+
+      <template lwc:if={view.hasFlags}>
+        <div class="slds-m-top_x-small chips" data-id="flags">
+          <template for:each={view.flags} for:item="flag">
+            <lightning-badge
+              key={flag.type}
+              label={flag.label}
+              class={flag.badgeClass}
+            ></lightning-badge>
+          </template>
+        </div>
+      </template>
+
+      <div class="slds-m-top_x-small footer">
+        <template lwc:if={isRecordPage}>
+          <lightning-button
+            variant="base"
+            label={photoButtonLabel}
+            icon-name="utility:photo"
+            onclick={togglePhotoUpload}
+            data-id="photo-button"
+          ></lightning-button>
+        </template>
+        <template lwc:if={view.hasApplication}>
+          <lightning-button
+            variant="base"
+            label="View application"
+            data-id={view.applicantId}
+            onclick={openRecord}
+          ></lightning-button>
+        </template>
+      </div>
+
+      <template lwc:if={isPhotoUploadOpen}>
+        <div class="slds-m-top_x-small" data-id="photo-upload">
+          <lightning-file-upload
+            label="Profile photo (optional, never used in scoring)"
+            accept={photoFormats}
+            record-id={recordId}
+            onuploadfinished={handlePhotoUploaded}
+          ></lightning-file-upload>
+        </div>
+      </template>
+    </template>
+  </article>
+</template>

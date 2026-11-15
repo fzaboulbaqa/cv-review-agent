@@ -1,0 +1,66 @@
+:host {
+  display: block;
+  height: 100%;
+}
+
+.candidate-card {
+  position: relative;
+  height: 100%;
+  min-height: 5rem;
+  padding: 0.75rem;
+  border: 1px solid var(--slds-g-color-border-base-1, #e5e5e5);
+  border-radius: 0.5rem;
+  background: var(--slds-g-color-neutral-base-100, #fff);
+}
+
+.photo {
+  flex-shrink: 0;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.initials {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--slds-g-color-brand-base-30, #0176d3);
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: default;
+}
+
+.identity {
+  min-width: 0;
+}
+
+.name {
+  font-weight: 700;
+}
+
+.score-holder {
+  flex-shrink: 0;
+  margin-left: 0.5rem;
+  text-align: center;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.chips lightning-badge {
+  margin: 0;
+}
+
+.missing {
+  font-style: italic;
+  color: var(--slds-g-color-neutral-base-50, #747474);
+}
+
+.footer {
+  text-align: right;
+}
