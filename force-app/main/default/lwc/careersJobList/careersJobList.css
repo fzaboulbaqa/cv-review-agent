@@ -1,0 +1,284 @@
+:host {
+  display: block;
+  --careers-blue: #0176d3;
+  --careers-navy: #032d60;
+  --careers-text: #181818;
+  --careers-muted: #5c5c5c;
+  --careers-border: #e5e5e5;
+  color: var(--careers-text);
+}
+
+.careers {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+
+.page-title {
+  margin: 0 0 1.75rem;
+  font-size: 2.75rem;
+  font-weight: 700;
+  color: var(--careers-navy);
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 340px) 1fr;
+  gap: 2.5rem;
+  align-items: start;
+}
+
+/* ---------- Filter panel ---------- */
+
+.filters {
+  padding: 2rem 1.75rem;
+  border-radius: 1rem;
+  background: var(--careers-blue);
+  color: #fff;
+  position: sticky;
+  top: 1rem;
+}
+
+.filters-title {
+  margin: 0 0 1.25rem;
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.filter-label {
+  display: block;
+  margin-bottom: 0.75rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.keyword,
+.years {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0.9rem 1.1rem;
+  border: 0;
+  border-radius: 0.75rem;
+  font-size: 1rem;
+  color: var(--careers-text);
+}
+
+.keyword:focus,
+.years:focus {
+  outline: 3px solid #90d0fe;
+}
+
+.section {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.section:first-of-type {
+  margin-top: 1.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.section-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 1.1rem 0.5rem;
+  border: 0;
+  background: none;
+  color: #fff;
+  font-size: 1.25rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.chevron {
+  --slds-c-icon-color-foreground-default: #fff;
+}
+
+.options {
+  margin: 0;
+  padding: 0 0.5rem 1rem;
+  list-style: none;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.3rem 0;
+  cursor: pointer;
+}
+
+.option input {
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: var(--careers-navy);
+}
+
+.option-label {
+  display: block;
+  margin: 0 0.5rem 0.5rem;
+}
+
+.years {
+  margin: 0 0 1rem;
+}
+
+.clear {
+  margin-top: 1.25rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #fff;
+  font-size: 1rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* ---------- Results ---------- */
+
+.results-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.result-count {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.page,
+.arrow {
+  min-width: 2.25rem;
+  height: 2.25rem;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--careers-muted);
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.page.current {
+  color: var(--careers-text);
+  font-weight: 700;
+}
+
+.arrow {
+  min-width: 3rem;
+  height: 3rem;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.arrow:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.gap {
+  color: var(--careers-muted);
+}
+
+.job-list {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  min-height: 6rem;
+}
+
+.job-card {
+  display: block;
+  padding: 2rem 2.25rem;
+  border: 1px solid var(--careers-border);
+  border-radius: 1rem;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+  color: inherit;
+  text-decoration: none;
+  transition:
+    box-shadow 0.15s,
+    transform 0.15s;
+}
+
+.job-card:hover,
+.job-card:focus {
+  box-shadow: 0 6px 18px rgba(1, 118, 211, 0.18);
+  transform: translateY(-2px);
+  text-decoration: none;
+}
+
+.tag {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 1rem;
+  background: #eaf5fe;
+  color: var(--careers-navy);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.job-title {
+  margin: 0.9rem 0 0.75rem;
+  color: var(--careers-navy);
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+
+.job-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  color: var(--careers-navy);
+}
+
+.pin {
+  --slds-c-icon-color-foreground-default: var(--careers-navy);
+}
+
+.job-due {
+  margin: 0.5rem 0 0;
+  color: var(--careers-muted);
+  font-size: 0.9rem;
+}
+
+.message {
+  padding: 1.5rem;
+  border-radius: 1rem;
+  background: #f3f3f3;
+}
+
+.message.error {
+  background: #fef1ee;
+  color: #ba0517;
+}
+
+@media (max-width: 768px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .filters {
+    position: static;
+  }
+
+  .page-title {
+    font-size: 2rem;
+  }
+
+  .job-card {
+    padding: 1.5rem;
+  }
+}

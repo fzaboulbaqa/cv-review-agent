@@ -1,0 +1,184 @@
+:host {
+  display: block;
+  --careers-blue: #0176d3;
+  --careers-navy: #032d60;
+  --careers-muted: #5c5c5c;
+  --careers-border: #e5e5e5;
+}
+
+.apply-form {
+  margin-top: 2.5rem;
+  padding: 2.25rem;
+  border: 1px solid var(--careers-border);
+  border-radius: 1rem;
+  background: #fff;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+}
+
+h2 {
+  margin: 0 0 0.5rem;
+  color: var(--careers-navy);
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+
+.intro {
+  margin: 0 0 1.5rem;
+  color: var(--careers-muted);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem 1.5rem;
+}
+
+.files {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin: 1.75rem 0;
+}
+
+.file-block {
+  padding: 1.25rem;
+  border: 1px dashed #b0adab;
+  border-radius: 0.75rem;
+}
+
+.file-label {
+  margin: 0 0 0.75rem;
+  font-weight: 700;
+}
+
+.hint {
+  display: block;
+  color: var(--careers-muted);
+  font-size: 0.85rem;
+  font-weight: 400;
+}
+
+.file-button {
+  display: inline-block;
+  padding: 0.55rem 1.25rem;
+  border-radius: 2rem;
+  background: var(--careers-blue);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.file-button.secondary {
+  background: #fff;
+  border: 1px solid var(--careers-blue);
+  color: var(--careers-blue);
+}
+
+.file-button input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.file-button:focus-within {
+  outline: 3px solid #90d0fe;
+}
+
+.file-name {
+  display: block;
+  margin-top: 0.5rem;
+  color: var(--careers-muted);
+  font-size: 0.9rem;
+}
+
+.file-list {
+  margin: 0.75rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.file-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+  font-size: 0.9rem;
+}
+
+.remove {
+  border: 0;
+  background: none;
+  color: #ba0517;
+  cursor: pointer;
+}
+
+.consent {
+  display: block;
+  margin-bottom: 1.5rem;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+}
+
+.submit,
+.cancel {
+  padding: 0.8rem 1.75rem;
+  border-radius: 2rem;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.submit {
+  border: 0;
+  background: var(--careers-blue);
+  color: #fff;
+}
+
+.submit:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.cancel {
+  border: 1px solid var(--careers-border);
+  background: #fff;
+  color: var(--careers-navy);
+}
+
+.error {
+  margin: 0 0 1.25rem;
+  padding: 1rem;
+  border-radius: 0.75rem;
+  background: #fef1ee;
+  color: #ba0517;
+}
+
+.success {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.success-icon {
+  --slds-c-icon-color-foreground-default: #2e844a;
+}
+
+.success p {
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  .apply-form {
+    padding: 1.5rem;
+  }
+
+  .grid,
+  .files {
+    grid-template-columns: 1fr;
+  }
+}

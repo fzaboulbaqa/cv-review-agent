@@ -1,0 +1,146 @@
+<template>
+  <section class="apply-form" aria-labelledby="apply-title">
+    <template lwc:if={successMessage}>
+      <div class="success" role="status" data-id="success">
+        <lightning-icon
+          icon-name="utility:success"
+          size="small"
+          class="success-icon"
+        ></lightning-icon>
+        <div>
+          <h2>Application sent</h2>
+          <p>{successMessage}</p>
+        </div>
+      </div>
+    </template>
+
+    <template lwc:else>
+      <h2 id="apply-title">{title}</h2>
+      <p class="intro">
+        Fields marked with * are required. Your CV is read to match you with the
+        role.
+      </p>
+
+      <template lwc:if={error}>
+        <p class="error" role="alert" data-id="error">{error}</p>
+      </template>
+
+      <form onsubmit={handleSubmit} novalidate>
+        <div class="grid">
+          <lightning-input
+            label="Full name"
+            required
+            max-length="80"
+            value={fullName}
+            data-field="fullName"
+            onchange={handleInput}
+          ></lightning-input>
+          <lightning-input
+            type="email"
+            label="Email"
+            required
+            max-length="80"
+            value={email}
+            data-field="email"
+            onchange={handleInput}
+          ></lightning-input>
+          <lightning-input
+            type="tel"
+            label="Phone"
+            max-length="40"
+            value={phone}
+            data-field="phone"
+            onchange={handleInput}
+          ></lightning-input>
+          <lightning-input
+            label="Country"
+            max-length="80"
+            value={country}
+            data-field="country"
+            onchange={handleInput}
+          ></lightning-input>
+        </div>
+
+        <div class="files">
+          <div class="file-block">
+            <p class="file-label">
+              CV * <span class="hint">PDF or Word, up to 2 MB</span>
+            </p>
+            <label class="file-button">
+              <input
+                type="file"
+                accept={cvAccept}
+                onchange={handleCv}
+                data-id="cv-input"
+              />
+              <span>Choose CV</span>
+            </label>
+            <span class="file-name" data-id="cv-name">{cvName}</span>
+          </div>
+
+          <div class="file-block">
+            <p class="file-label">
+              Other documents
+              <span class="hint"
+                >Optional: cover letter, certificates. Up to 3 files</span
+              >
+            </p>
+            <template lwc:if={canAddOtherFiles}>
+              <label class="file-button secondary">
+                <input
+                  type="file"
+                  accept={otherAccept}
+                  multiple
+                  onchange={handleOtherFiles}
+                  data-id="other-input"
+                />
+                <span>Add documents</span>
+              </label>
+            </template>
+            <template lwc:if={hasOtherFiles}>
+              <ul class="file-list" data-id="other-files">
+                <template for:each={otherFileItems} for:item="file">
+                  <li key={file.key}>
+                    <span>{file.label}</span>
+                    <button
+                      type="button"
+                      class="remove"
+                      data-index={file.index}
+                      onclick={handleRemoveFile}
+                      aria-label="Remove file"
+                    >
+                      Remove
+                    </button>
+                  </li>
+                </template>
+              </ul>
+            </template>
+          </div>
+        </div>
+
+        <lightning-input
+          class="consent"
+          type="checkbox"
+          label="I agree that Clouding AI stores my data and documents to process my application. *"
+          checked={consent}
+          data-field="consent"
+          onchange={handleInput}
+        ></lightning-input>
+
+        <div class="actions">
+          <button type="button" class="cancel" onclick={handleCancel}>
+            Cancel
+          </button>
+          <button
+            type="submit"
+            class="submit"
+            disabled={isSubmitting}
+            data-id="submit"
+          >
+            {submitLabel}
+          </button>
+        </div>
+      </form>
+    </template>
+  </section>
+</template>

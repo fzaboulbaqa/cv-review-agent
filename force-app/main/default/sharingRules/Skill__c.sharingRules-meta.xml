@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<SharingRules xmlns="http://soap.sforce.com/2006/04/metadata">
+    <sharingGuestRules>
+        <fullName>Careers_Guest_Skills</fullName>
+        <accessLevel>Read</accessLevel>
+        <description
+    >Careers portal guest can read Skills. Only open jobs are shown: CareersController filters on the due date.</description>
+        <includeHVUOwnedRecords>false</includeHVUOwnedRecords>
+        <label>Careers Guest Skills</label>
+        <sharedTo>
+            <guestUser>Clouding_AI_Jobs</guestUser>
+        </sharedTo>
+        <criteriaItems>
+            <field>Name</field>
+            <operation>notEqual</operation>
+        </criteriaItems>
+    </sharingGuestRules>
+</SharingRules>

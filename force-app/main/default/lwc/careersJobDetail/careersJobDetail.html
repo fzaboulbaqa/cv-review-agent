@@ -1,0 +1,89 @@
+<template>
+  <div class="careers">
+    <a href="#" class="back" onclick={handleBack} data-id="back">
+      <lightning-icon
+        icon-name="utility:back"
+        size="xx-small"
+        class="back-icon"
+      ></lightning-icon>
+      <span>All jobs</span>
+    </a>
+
+    <template lwc:if={isLoading}>
+      <div class="loading">
+        <lightning-spinner
+          alternative-text="Loading job"
+          size="medium"
+        ></lightning-spinner>
+      </div>
+    </template>
+
+    <template lwc:if={error}>
+      <p class="message error" role="alert" data-id="error">{error}</p>
+    </template>
+
+    <template lwc:elseif={detail}>
+      <header class="job-header">
+        <div>
+          <span class="tag">{job.tag}</span>
+          <h1 class="job-title" data-id="title">{job.title}</h1>
+          <p class="job-meta">
+            <lightning-icon
+              icon-name="utility:checkin"
+              size="xx-small"
+              class="pin"
+            ></lightning-icon>
+            <span>{job.location}</span>
+          </p>
+          <p class="job-due">{job.dueLabel}</p>
+        </div>
+        <template lwc:if={showApplyButton}>
+          <button
+            class="apply"
+            type="button"
+            onclick={handleApply}
+            data-id="apply"
+          >
+            Apply now
+          </button>
+        </template>
+      </header>
+
+      <div class="job-body">
+        <section class="description">
+          <h2>About the job</h2>
+          <p class="text" data-id="description">{description}</p>
+        </section>
+
+        <aside class="requirements">
+          <h2>What we look for</h2>
+          <p class="requirement">{job.experienceLabel}</p>
+          <template lwc:if={hasMustHave}>
+            <h3>Must have</h3>
+            <ul class="skills" data-id="must-have">
+              <template for:each={detail.mustHaveSkills} for:item="skill">
+                <li key={skill} class="skill must">{skill}</li>
+              </template>
+            </ul>
+          </template>
+          <template lwc:if={hasNiceToHave}>
+            <h3>Nice to have</h3>
+            <ul class="skills" data-id="nice-to-have">
+              <template for:each={detail.niceToHaveSkills} for:item="skill">
+                <li key={skill} class="skill">{skill}</li>
+              </template>
+            </ul>
+          </template>
+        </aside>
+      </div>
+
+      <template lwc:if={isApplying}>
+        <c-careers-apply-form
+          job-id={jobId}
+          job-title={job.title}
+          oncancel={handleCancelApply}
+        ></c-careers-apply-form>
+      </template>
+    </template>
+  </div>
+</template>

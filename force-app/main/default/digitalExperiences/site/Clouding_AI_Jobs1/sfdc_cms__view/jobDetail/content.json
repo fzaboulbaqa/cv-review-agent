@@ -1,0 +1,80 @@
+{
+  "type": "sfdc_cms__view",
+  "title": "Job Detail",
+  "contentBody": {
+    "component": {
+      "children": [
+        {
+          "children": [
+            {
+              "attributes": {
+                "backgroundImageConfig": "",
+                "backgroundImageOverlay": "rgba(0,0,0,0)",
+                "componentSpacerSize": "",
+                "layoutDirectionDesktop": "row",
+                "layoutDirectionMobile": "column",
+                "layoutDirectionTablet": "column",
+                "maxContentWidth": "",
+                "sectionColumnGutterWidth": "",
+                "sectionConfig": "{\"UUID\":\"45ac4417-92c6-430b-8ceb-19fa93ab3f3a\",\"columns\":[{\"UUID\":\"40f8a2a2-adaa-44c1-9514-f86fdde7ff52\",\"columnName\":\"Column 1\",\"columnKey\":\"col1\",\"columnWidth\":\"12\",\"seedComponents\":null}]}",
+                "sectionMinHeight": "",
+                "sectionVerticalAlign": "flex-start"
+              },
+              "children": [
+                {
+                  "children": [
+                    {
+                      "attributes": {
+                        "listPageApiName": "Home"
+                      },
+                      "definition": "c:careersJobDetail",
+                      "id": "bdb10baf-20b8-42d6-b73e-727903ea27a9",
+                      "type": "component"
+                    }
+                  ],
+                  "id": "40f8a2a2-adaa-44c1-9514-f86fdde7ff52",
+                  "name": "col1",
+                  "title": "Column 1",
+                  "type": "region"
+                }
+              ],
+              "definition": "community_layout:section",
+              "id": "45ac4417-92c6-430b-8ceb-19fa93ab3f3a",
+              "type": "component"
+            }
+          ],
+          "id": "24fdb79f-d124-4c76-a37a-deb4343b36d7",
+          "name": "content",
+          "title": "Content",
+          "type": "region"
+        },
+        {
+          "children": [
+            {
+              "attributes": {
+                "customHeadTags": "",
+                "description": "",
+                "pageTitle": "Job Detail",
+                "recordId": "{!recordId}"
+              },
+              "definition": "community_builder:seoAssistant",
+              "id": "b4e5e5a5-310f-4325-b1a3-f5f3256eca8b",
+              "type": "component"
+            }
+          ],
+          "id": "a0c1596b-b686-4eb6-baf3-b027fb5d4ebd",
+          "name": "sfdcHiddenRegion",
+          "title": "sfdcHiddenRegion",
+          "type": "region"
+        }
+      ],
+      "definition": "community_layout:sldsFlexibleLayout",
+      "id": "555a6c1a-7025-4eff-8ffd-613e3eab3453",
+      "type": "component"
+    },
+    "dataProviders": [],
+    "themeLayoutType": "Inner",
+    "viewType": "custom-job-detail"
+  },
+  "urlName": "job-detail"
+}

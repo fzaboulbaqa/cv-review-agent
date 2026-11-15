@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<LightningComponentBundle xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>62.0</apiVersion>
+    <isExposed>true</isExposed>
+    <masterLabel>Careers Job List</masterLabel>
+    <description
+  >Open jobs with filters and pagination for the careers portal.</description>
+    <targets>
+        <target>lightningCommunity__Page</target>
+        <target>lightningCommunity__Default</target>
+    </targets>
+    <targetConfigs>
+        <targetConfig targets="lightningCommunity__Default">
+            <property
+        name="detailPageApiName"
+        type="String"
+        default="Job_Detail__c"
+        label="Job detail page API name"
+        description="API name of the page that holds the Careers Job Detail component."
+      />
+        </targetConfig>
+    </targetConfigs>
+</LightningComponentBundle>

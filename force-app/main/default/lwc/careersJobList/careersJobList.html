@@ -1,0 +1,231 @@
+<template>
+  <div class="careers">
+    <h1 class="page-title">Jobs</h1>
+
+    <div class="layout">
+      <!-- Filter panel -->
+      <aside class="filters" aria-label="Filter jobs">
+        <h2 class="filters-title">Filter jobs</h2>
+
+        <label class="filter-label" for="keyword">Keywords</label>
+        <input
+          id="keyword"
+          class="keyword"
+          type="search"
+          placeholder="Search by job title, skill or location"
+          value={keyword}
+          oninput={handleKeyword}
+          data-id="keyword"
+        />
+
+        <template lwc:if={hasLocations}>
+          <div class="section">
+            <button
+              class="section-toggle"
+              type="button"
+              data-section="location"
+              aria-expanded={sections.location.open}
+              onclick={handleToggleSection}
+            >
+              <span>Location {sections.location.count}</span>
+              <lightning-icon
+                icon-name={sections.location.icon}
+                size="x-small"
+                class="chevron"
+              ></lightning-icon>
+            </button>
+            <template lwc:if={sections.location.open}>
+              <ul class="options" data-id="location-options">
+                <template for:each={locationOptions} for:item="option">
+                  <li key={option.key}>
+                    <label class="option">
+                      <input
+                        type="checkbox"
+                        value={option.value}
+                        checked={option.checked}
+                        onchange={handleLocation}
+                      />
+                      <span>{option.value}</span>
+                    </label>
+                  </li>
+                </template>
+              </ul>
+            </template>
+          </div>
+        </template>
+
+        <template lwc:if={hasSkills}>
+          <div class="section">
+            <button
+              class="section-toggle"
+              type="button"
+              data-section="skills"
+              aria-expanded={sections.skills.open}
+              onclick={handleToggleSection}
+            >
+              <span>Skills {sections.skills.count}</span>
+              <lightning-icon
+                icon-name={sections.skills.icon}
+                size="x-small"
+                class="chevron"
+              ></lightning-icon>
+            </button>
+            <template lwc:if={sections.skills.open}>
+              <ul class="options" data-id="skill-options">
+                <template for:each={skillOptions} for:item="option">
+                  <li key={option.key}>
+                    <label class="option">
+                      <input
+                        type="checkbox"
+                        value={option.value}
+                        checked={option.checked}
+                        onchange={handleSkill}
+                      />
+                      <span>{option.value}</span>
+                    </label>
+                  </li>
+                </template>
+              </ul>
+            </template>
+          </div>
+        </template>
+
+        <div class="section">
+          <button
+            class="section-toggle"
+            type="button"
+            data-section="experience"
+            aria-expanded={sections.experience.open}
+            onclick={handleToggleSection}
+          >
+            <span>Experience {sections.experience.count}</span>
+            <lightning-icon
+              icon-name={sections.experience.icon}
+              size="x-small"
+              class="chevron"
+            ></lightning-icon>
+          </button>
+          <template lwc:if={sections.experience.open}>
+            <label class="option-label" for="years"
+              >My years of experience</label
+            >
+            <input
+              id="years"
+              class="years"
+              type="number"
+              min="0"
+              max="60"
+              value={years}
+              onchange={handleYears}
+              data-id="years"
+            />
+          </template>
+        </div>
+
+        <template lwc:if={hasActiveFilters}>
+          <button
+            class="clear"
+            type="button"
+            onclick={handleClear}
+            data-id="clear"
+          >
+            Clear all filters
+          </button>
+        </template>
+      </aside>
+
+      <!-- Results -->
+      <section class="results" aria-live="polite">
+        <div class="results-header">
+          <p class="result-count" data-id="result-count">{resultLabel}</p>
+          <template lwc:if={hasPages}>
+            <nav class="pagination" aria-label="Pages">
+              <button
+                class="arrow"
+                type="button"
+                disabled={isFirstPage}
+                onclick={handlePrevious}
+                aria-label="Previous page"
+              >
+                <lightning-icon
+                  icon-name="utility:back"
+                  size="x-small"
+                ></lightning-icon>
+              </button>
+              <template for:each={pages} for:item="item">
+                <template lwc:if={item.isGap}>
+                  <span key={item.key} class="gap">…</span>
+                </template>
+                <template lwc:else>
+                  <button
+                    key={item.key}
+                    class={item.className}
+                    type="button"
+                    data-page={item.page}
+                    aria-current={item.ariaCurrent}
+                    onclick={handlePage}
+                  >
+                    {item.page}
+                  </button>
+                </template>
+              </template>
+              <button
+                class="arrow"
+                type="button"
+                disabled={isLastPage}
+                onclick={handleNext}
+                aria-label="Next page"
+                data-id="next"
+              >
+                <lightning-icon
+                  icon-name="utility:forward"
+                  size="x-small"
+                ></lightning-icon>
+              </button>
+            </nav>
+          </template>
+        </div>
+
+        <template lwc:if={error}>
+          <p class="message error" role="alert" data-id="error">{error}</p>
+        </template>
+
+        <template lwc:if={isEmpty}>
+          <p class="message" data-id="empty">
+            No open jobs match your filters.
+          </p>
+        </template>
+
+        <div class="job-list">
+          <template lwc:if={isLoading}>
+            <lightning-spinner
+              alternative-text="Loading jobs"
+              size="medium"
+            ></lightning-spinner>
+          </template>
+          <template for:each={jobs} for:item="job">
+            <a
+              key={job.id}
+              href="#"
+              class="job-card"
+              data-id={job.id}
+              onclick={openJob}
+            >
+              <span class="tag">{job.tag}</span>
+              <h3 class="job-title">{job.title}</h3>
+              <p class="job-meta">
+                <lightning-icon
+                  icon-name="utility:checkin"
+                  size="xx-small"
+                  class="pin"
+                ></lightning-icon>
+                <span>{job.location}</span>
+              </p>
+              <p class="job-due">{job.dueLabel}</p>
+            </a>
+          </template>
+        </div>
+      </section>
+    </div>
+  </div>
+</template>

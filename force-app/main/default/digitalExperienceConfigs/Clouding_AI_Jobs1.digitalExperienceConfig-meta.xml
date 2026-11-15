@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<DigitalExperienceConfig xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>Clouding AI Jobs</label>
+    <site>
+        <urlPathPrefix>jobs</urlPathPrefix>
+    </site>
+    <space>site/Clouding_AI_Jobs1</space>
+</DigitalExperienceConfig>
