@@ -14,13 +14,7 @@ body {
   margin: 0;
 }
 
-/* Careers header (c-careers-header): full-width navy bar instead of the theme's gray framed header. */
-.community_byo-scoped-header-and-footer__header-content.community_byo-scoped-header-and-footer__header-content {
-  background-color: #010c1c;
-  max-width: none;
-}
-
-.community_byo-scoped-header-and-footer__header-content
-  community_layout-section {
-  padding: 0 !important;
+/* No site header: hide the theme's empty header bar. */
+.community_byo-scoped-header-and-footer__header-content {
+  display: none;
 }

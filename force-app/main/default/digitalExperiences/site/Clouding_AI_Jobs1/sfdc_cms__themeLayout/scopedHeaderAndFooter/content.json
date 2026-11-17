@@ -31,16 +31,7 @@
                   "name": "headerSection",
                   "title": "Theme Header",
                   "type": "region",
-                  "children": [
-                    {
-                      "attributes": {
-                        "homePageApiName": "Home"
-                      },
-                      "definition": "c:careersHeader",
-                      "id": "034d9afc-c622-4f1f-80ca-04455defc4ff",
-                      "type": "component"
-                    }
-                  ]
+                  "children": []
                 }
               ],
               "definition": "community_layout:section",
