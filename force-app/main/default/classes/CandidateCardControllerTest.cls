@@ -2,37 +2,30 @@
 private class CandidateCardControllerTest {
   @TestSetup
   static void setup() {
-    Candidate__c candidate = new Candidate__c(
-      Name = 'Test Candidate',
-      Email__c = 'candidate@test.cvreview',
-      Current_Title__c = 'Salesforce Developer',
-      Years_Experience__c = 4
+    Candidate__c candidate = TestDataFactory.newCandidate('Test Candidate');
+    candidate.Current_Title__c = 'Salesforce Developer';
+    candidate.Years_Experience__c = 4;
+    insert candidate;
+    TestDataFactory.addCandidateSkills(
+      candidate.Id,
+      new List<String>{ 'LWC', 'Apex' }
     );
-    Job__c job = new Job__c(Name = 'Salesforce Developer');
-    Skill__c apex = new Skill__c(Name = 'Apex');
-    Skill__c lwc = new Skill__c(Name = 'LWC');
-    insert new List<SObject>{ candidate, job, apex, lwc };
-    insert new List<SObject>{
-      new Candidate_Skill__c(Candidate__c = candidate.Id, Skill__c = lwc.Id),
-      new Candidate_Skill__c(Candidate__c = candidate.Id, Skill__c = apex.Id),
-      new Extraction_Flag__c(
-        Candidate__c = candidate.Id,
-        Type__c = 'Missing',
-        Field__c = 'Phone__c',
-        Detail__c = 'No phone.'
+    insert new List<Extraction_Flag__c>{
+      TestDataFactory.newFlag(
+        candidate.Id,
+        Constants.FLAG_MISSING,
+        'Phone',
+        'No phone.'
       ),
-      new Extraction_Flag__c(
-        Candidate__c = candidate.Id,
-        Type__c = 'Inferred',
-        Field__c = 'Skills',
-        Detail__c = 'LWC inferred.'
-      ),
-      new Job_Applicant__c(
-        Candidate__c = candidate.Id,
-        Job__c = job.Id,
-        Score__c = 75
+      TestDataFactory.newFlag(
+        candidate.Id,
+        Constants.FLAG_INFERRED,
+        'Skills',
+        'LWC inferred.'
       )
     };
+    Job__c job = TestDataFactory.createJob('Salesforce Developer');
+    TestDataFactory.createApplicant(job.Id, candidate.Id, 75);
   }
 
   @IsTest
@@ -158,11 +151,7 @@ private class CandidateCardControllerTest {
   @IsTest
   static void rejectsFileOfAnotherRecord() {
     Candidate__c candidate = getCandidate();
-    Candidate__c other = new Candidate__c(
-      Name = 'Other',
-      Email__c = 'other@test.cvreview'
-    );
-    insert other;
+    Candidate__c other = TestDataFactory.createCandidate('Other');
     ContentVersion photo = insertFile(other.Id, 'photo.png');
 
     try {
@@ -183,17 +172,6 @@ private class CandidateCardControllerTest {
   }
 
   private static ContentVersion insertFile(Id recordId, String fileName) {
-    ContentVersion version = new ContentVersion(
-      Title = fileName.substringBeforeLast('.'),
-      PathOnClient = fileName,
-      VersionData = Blob.valueOf('test content'),
-      FirstPublishLocationId = recordId
-    );
-    insert version;
-    return [
-      SELECT Id, ContentDocumentId
-      FROM ContentVersion
-      WHERE Id = :version.Id
-    ];
+    return TestDataFactory.createFile(recordId, fileName, 'test content');
   }
 }

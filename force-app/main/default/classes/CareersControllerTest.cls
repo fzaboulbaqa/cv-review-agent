@@ -2,53 +2,42 @@
 private class CareersControllerTest {
   @TestSetup
   static void setup() {
-    Skill__c apex = new Skill__c(Name = 'Apex');
-    Skill__c sql = new Skill__c(Name = 'SQL');
-    Job__c dev = new Job__c(
-      Name = 'Salesforce Developer',
-      Location__c = 'Morocco - Casablanca',
-      Min_Years_Experience__c = 5,
-      Due_Date__c = Date.today().addDays(10),
-      Description__c = 'Build Apex and LWC.'
+    Job__c dev = TestDataFactory.newJob('Salesforce Developer');
+    dev.Location__c = 'Morocco - Casablanca';
+    dev.Min_Years_Experience__c = 5;
+    dev.Due_Date__c = Date.today().addDays(10);
+    dev.Description__c = 'Build Apex and LWC.';
+    Job__c analyst = TestDataFactory.newJob('Data Analyst');
+    analyst.Location__c = 'Remote';
+    analyst.Min_Years_Experience__c = 2;
+    analyst.Due_Date__c = Date.today().addDays(20);
+    Job__c noDueDate = TestDataFactory.newJob('Open Application');
+    noDueDate.Location__c = 'Remote';
+    Job__c closed = TestDataFactory.newJob('Closed Job');
+    closed.Location__c = 'Paris';
+    closed.Due_Date__c = Date.today().addDays(-1);
+    insert new List<Job__c>{ dev, analyst, noDueDate, closed };
+
+    TestDataFactory.addJobSkills(
+      dev.Id,
+      new List<String>{ 'Apex' },
+      Constants.IMPORTANCE_MUST_HAVE
     );
-    Job__c analyst = new Job__c(
-      Name = 'Data Analyst',
-      Location__c = 'Remote',
-      Min_Years_Experience__c = 2,
-      Due_Date__c = Date.today().addDays(20)
+    TestDataFactory.addJobSkills(
+      dev.Id,
+      new List<String>{ 'SQL' },
+      Constants.IMPORTANCE_NICE_TO_HAVE
     );
-    Job__c noDueDate = new Job__c(
-      Name = 'Open Application',
-      Location__c = 'Remote'
+    TestDataFactory.addJobSkills(
+      analyst.Id,
+      new List<String>{ 'SQL' },
+      Constants.IMPORTANCE_MUST_HAVE
     );
-    Job__c closed = new Job__c(
-      Name = 'Closed Job',
-      Location__c = 'Paris',
-      Due_Date__c = Date.today().addDays(-1)
+    TestDataFactory.addJobSkills(
+      closed.Id,
+      new List<String>{ 'Apex' },
+      Constants.IMPORTANCE_MUST_HAVE
     );
-    insert new List<SObject>{ apex, sql, dev, analyst, noDueDate, closed };
-    insert new List<Job_Skill__c>{
-      new Job_Skill__c(
-        Job__c = dev.Id,
-        Skill__c = apex.Id,
-        Importance__c = 'Must Have'
-      ),
-      new Job_Skill__c(
-        Job__c = dev.Id,
-        Skill__c = sql.Id,
-        Importance__c = 'Nice To Have'
-      ),
-      new Job_Skill__c(
-        Job__c = analyst.Id,
-        Skill__c = sql.Id,
-        Importance__c = 'Must Have'
-      ),
-      new Job_Skill__c(
-        Job__c = closed.Id,
-        Skill__c = apex.Id,
-        Importance__c = 'Must Have'
-      )
-    };
   }
 
   @IsTest
@@ -131,7 +120,7 @@ private class CareersControllerTest {
   static void pagesResults() {
     List<Job__c> more = new List<Job__c>();
     for (Integer i = 0; i < CareersController.PAGE_SIZE; i++) {
-      more.add(new Job__c(Name = 'Extra ' + i));
+      more.add(TestDataFactory.newJob('Extra ' + i));
     }
     insert more;
 

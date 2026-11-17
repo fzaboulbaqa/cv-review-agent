@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<GenAiFunction xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description
+  >Answers a question about one candidate, several candidates, the applicants of a job, or all candidates, using only the text of their CVs, with quotes as references. Says when the CV does not contain the answer.</description>
+    <developerName>Answer_Question_About_Candidates</developerName>
+    <invocationTarget>AgentAskAboutCandidates</invocationTarget>
+    <invocationTargetType>apex</invocationTargetType>
+    <isConfirmationRequired>false</isConfirmationRequired>
+    <isIncludeInProgressIndicator>false</isIncludeInProgressIndicator>
+    <localDeveloperName>Answer_Question_About_Candidates</localDeveloperName>
+    <masterLabel>Answer Question About Candidates</masterLabel>
+</GenAiFunction>

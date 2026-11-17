@@ -1,0 +1,24 @@
+{
+  "unevaluatedProperties": false,
+  "properties": {
+    "bookmarkId": {
+      "title": "Bookmark ID",
+      "description": "_",
+      "lightning:type": "lightning__textType",
+      "lightning:isPII": false,
+      "copilotAction:isDisplayable": false,
+      "copilotAction:isUsedByPlanner": true,
+      "copilotAction:useHydratedPrompt": false
+    },
+    "message": {
+      "title": "Result",
+      "description": "Whether the bookmark was created or already existed.",
+      "lightning:type": "lightning__textType",
+      "lightning:isPII": false,
+      "copilotAction:isDisplayable": true,
+      "copilotAction:isUsedByPlanner": true,
+      "copilotAction:useHydratedPrompt": false
+    }
+  },
+  "lightning:type": "lightning__objectType"
+}

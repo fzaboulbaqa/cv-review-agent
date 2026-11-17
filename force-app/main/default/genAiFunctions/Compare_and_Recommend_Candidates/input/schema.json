@@ -1,0 +1,21 @@
+{
+  "required": ["jobId"],
+  "unevaluatedProperties": false,
+  "properties": {
+    "candidateIds": {
+      "title": "Candidate IDs",
+      "description": "Optional. Compare only these applicants (comma separated). Empty: all applicants of the job.",
+      "lightning:type": "lightning__textType",
+      "lightning:isPII": false,
+      "copilotAction:isUserInput": false
+    },
+    "jobId": {
+      "title": "Job ID",
+      "description": "The job (role) to compare the candidates for.",
+      "lightning:type": "lightning__textType",
+      "lightning:isPII": false,
+      "copilotAction:isUserInput": false
+    }
+  },
+  "lightning:type": "lightning__objectType"
+}

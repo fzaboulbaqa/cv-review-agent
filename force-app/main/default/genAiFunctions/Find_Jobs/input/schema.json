@@ -1,0 +1,13 @@
+{
+  "unevaluatedProperties": false,
+  "properties": {
+    "searchText": {
+      "title": "Search Text",
+      "description": "Part of the job title or location, e.g. \"Salesforce Developer\". Leave empty to list the open jobs.",
+      "lightning:type": "lightning__textType",
+      "lightning:isPII": false,
+      "copilotAction:isUserInput": false
+    }
+  },
+  "lightning:type": "lightning__objectType"
+}

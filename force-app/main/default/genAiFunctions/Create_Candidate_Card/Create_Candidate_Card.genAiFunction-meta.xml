@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<GenAiFunction xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description
+  >Reads the CV attached to existing candidates and fills their Candidate Card: the empty fields (title, summary, years of experience, experience, education, achievements, contact data), the skills, and the missing, inferred and conflicting data. Values already on the record are kept. Then scores their applications.</description>
+    <developerName>Create_Candidate_Card</developerName>
+    <invocationTarget>AgentCreateCandidateCard</invocationTarget>
+    <invocationTargetType>apex</invocationTargetType>
+    <isConfirmationRequired>false</isConfirmationRequired>
+    <isIncludeInProgressIndicator>false</isIncludeInProgressIndicator>
+    <localDeveloperName>Create_Candidate_Card</localDeveloperName>
+    <masterLabel>Create Candidate Card</masterLabel>
+</GenAiFunction>

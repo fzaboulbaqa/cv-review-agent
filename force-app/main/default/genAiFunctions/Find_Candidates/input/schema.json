@@ -1,0 +1,20 @@
+{
+  "unevaluatedProperties": false,
+  "properties": {
+    "jobId": {
+      "title": "Job ID",
+      "description": "Optional. Lists the applicants of this job (with their application id and score).",
+      "lightning:type": "lightning__textType",
+      "lightning:isPII": false,
+      "copilotAction:isUserInput": false
+    },
+    "searchText": {
+      "title": "Search Text",
+      "description": "Part of a candidate name, a job title or a skill, e.g. \"Sara\" or \"Apex\". Optional when a job id is given.",
+      "lightning:type": "lightning__textType",
+      "lightning:isPII": false,
+      "copilotAction:isUserInput": false
+    }
+  },
+  "lightning:type": "lightning__objectType"
+}

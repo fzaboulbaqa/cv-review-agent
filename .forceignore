@@ -9,3 +9,9 @@ package.xml
 **/.eslintrc.json
 
 node_modules/
+
+# Generated when the agent is published from aiAuthoringBundles (sf agent publish authoring-bundle)
+**/genAiPlannerBundles/**
+**/bots/**
+**/aiAgents/**
+**/aiAgentDefinitionVersions/**

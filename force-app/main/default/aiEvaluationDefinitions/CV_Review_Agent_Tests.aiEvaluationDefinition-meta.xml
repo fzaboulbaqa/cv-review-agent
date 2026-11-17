@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<AiEvaluationDefinition xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description
+  >Actions and outcomes of the CV Review Agent on the demo data. Routed requests are checked by the actions called (the new builder reports the router, agent_router, as the topic).</description>
+    <name>CV Review Agent Tests</name>
+    <subjectName>CV_Review_Agent</subjectName>
+    <subjectType>AGENT</subjectType>
+    <testCase>
+        <expectation>
+            <expectedValue>agent_router</expectedValue>
+            <name>topic_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue
+      >[&apos;Find_Candidates&apos;,&apos;Create_Candidate_Card&apos;]</expectedValue>
+            <name>action_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue
+      >The agent reports the card of Karim El Fassi: fields filled, skills added, and the missing, inferred and conflicting values. It does not show record ids.</expectedValue>
+            <name>bot_response_rating</name>
+        </expectation>
+        <inputs>
+            <utterance>Create the candidate card of Karim El Fassi</utterance>
+        </inputs>
+        <number>1</number>
+    </testCase>
+    <testCase>
+        <expectation>
+            <expectedValue>agent_router</expectedValue>
+            <name>topic_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue
+      >[&apos;Find_Candidates&apos;,&apos;Answer_Question_About_Candidates&apos;]</expectedValue>
+            <name>action_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue
+      >The agent quotes the CV (10 years stated) and mentions that the job dates give fewer years. It does not invent anything.</expectedValue>
+            <name>bot_response_rating</name>
+        </expectation>
+        <inputs>
+            <utterance
+      >What does Karim El Fassi&apos;s CV say about his years of experience?</utterance>
+        </inputs>
+        <number>2</number>
+    </testCase>
+    <testCase>
+        <expectation>
+            <expectedValue>agent_router</expectedValue>
+            <name>topic_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue
+      >[&apos;Find_Jobs&apos;,&apos;Answer_Question_About_Candidates&apos;]</expectedValue>
+            <name>action_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue
+      >The agent names the applicants whose CV mentions Docker, with a quote, and says there is no evidence for the others.</expectedValue>
+            <name>bot_response_rating</name>
+        </expectation>
+        <inputs>
+            <utterance
+      >Who has worked with Docker among the applicants of the Senior Salesforce Developer job?</utterance>
+        </inputs>
+        <number>3</number>
+    </testCase>
+    <testCase>
+        <expectation>
+            <expectedValue>agent_router</expectedValue>
+            <name>topic_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue
+      >[&apos;Find_Jobs&apos;,&apos;Compare_and_Recommend_Candidates&apos;]</expectedValue>
+            <name>action_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue
+      >The agent recommends one or more candidates, shows the ranking with scores and match levels, explains trade-offs and gaps, and offers to bookmark a candidate.</expectedValue>
+            <name>bot_response_rating</name>
+        </expectation>
+        <inputs>
+            <utterance
+      >Compare the applicants for the Senior Salesforce Developer job</utterance>
+        </inputs>
+        <number>4</number>
+    </testCase>
+    <testCase>
+        <expectation>
+            <expectedValue>agent_router</expectedValue>
+            <name>topic_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue
+      >[&apos;Find_Jobs&apos;,&apos;Compare_and_Recommend_Candidates&apos;]</expectedValue>
+            <name>action_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue
+      >The agent shows the ranking. If no applicant scores 75 or more it says there is no strong match, gives the best available option and the gaps to check in interview.</expectedValue>
+            <name>bot_response_rating</name>
+        </expectation>
+        <inputs>
+            <utterance
+      >Compare the applicants for the Data Analyst job</utterance>
+        </inputs>
+        <number>5</number>
+    </testCase>
+    <testCase>
+        <expectation>
+            <expectedValue>off_topic</expectedValue>
+            <name>topic_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>[]</expectedValue>
+            <name>action_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue
+      >The agent does not answer the weather question and redirects to what it can help with.</expectedValue>
+            <name>bot_response_rating</name>
+        </expectation>
+        <inputs>
+            <utterance>What&apos;s the weather in Paris today?</utterance>
+        </inputs>
+        <number>6</number>
+    </testCase>
+</AiEvaluationDefinition>

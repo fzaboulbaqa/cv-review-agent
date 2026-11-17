@@ -31,10 +31,6 @@ public without sharing class CareersApplicationService {
     'jpg',
     'jpeg'
   };
-  private static final Pattern EMAIL_PATTERN = Pattern.compile(
-    '^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$'
-  );
-  private static final String LOG_TAG = 'Careers';
 
   public class Application {
     @AuraEnabled
@@ -104,7 +100,7 @@ public without sharing class CareersApplicationService {
             candidate.Id +
             ')'
         )
-        .addTag(LOG_TAG);
+        .addTag(Constants.LOG_TAG_CAREERS);
       Logger.saveLog();
       result.success = true;
       result.message =
@@ -120,7 +116,7 @@ public without sharing class CareersApplicationService {
       Database.rollback(savepoint);
       Logger.error('Application failed for job ' + application?.jobId)
         .setExceptionDetails(ex)
-        .addTag(LOG_TAG);
+        .addTag(Constants.LOG_TAG_CAREERS);
       Logger.saveLog();
       result.message = 'Your application could not be sent. Please try again later.';
       return result;
@@ -133,7 +129,7 @@ public without sharing class CareersApplicationService {
     }
     require(application.fullName, 'Full name', 80);
     require(application.email, 'Email', 80);
-    if (!EMAIL_PATTERN.matcher(application.email.trim()).matches()) {
+    if (!Constants.isValidEmail(application.email.trim())) {
       throw new ValidationException('Please enter a valid email address.');
     }
     limitLength(application.phone, 'Phone', 40);

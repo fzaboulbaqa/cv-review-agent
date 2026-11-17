@@ -8,15 +8,6 @@
  * cacheable method). The LWC reloads the card itself when the record changes.
  */
 public with sharing class CandidateCardController {
-  private static final String LOG_TAG = 'CandidateCard';
-  private static final Set<String> IMAGE_TYPES = new Set<String>{
-    'PNG',
-    'JPG',
-    'JPEG',
-    'GIF',
-    'WEBP'
-  };
-
   public class Card {
     @AuraEnabled
     public Id candidateId;
@@ -120,16 +111,13 @@ public with sharing class CandidateCardController {
     ]) {
       Card card = cards.get((Id) row.get('candidateId'));
       Integer count = (Integer) row.get('flagCount');
-      switch on (String) row.get('flagType') {
-        when 'Missing' {
-          card.missingCount = count;
-        }
-        when 'Inferred' {
-          card.inferredCount = count;
-        }
-        when 'Conflict' {
-          card.conflictCount = count;
-        }
+      String flagType = (String) row.get('flagType');
+      if (flagType == Constants.FLAG_MISSING) {
+        card.missingCount = count;
+      } else if (flagType == Constants.FLAG_INFERRED) {
+        card.inferredCount = count;
+      } else if (flagType == Constants.FLAG_CONFLICT) {
+        card.conflictCount = count;
       }
     }
     return cards;
@@ -167,7 +155,9 @@ public with sharing class CandidateCardController {
         throw auraError('The file is not attached to this candidate.');
       }
       PhotoResult result = new PhotoResult();
-      if (!IMAGE_TYPES.contains(version.FileType)) {
+      if (
+        !Constants.IMAGE_EXTENSIONS.contains(version.FileType?.toLowerCase())
+      ) {
         delete as user new ContentDocument(Id = version.ContentDocumentId);
         result.error = 'The photo must be a PNG, JPG, GIF or WEBP image.';
         return result;
@@ -186,7 +176,8 @@ public with sharing class CandidateCardController {
       );
       deletePreviousPhoto(previousVersionId, version.ContentDocumentId);
 
-      Logger.info('Photo set for candidate ' + candidateId).addTag(LOG_TAG);
+      Logger.info('Photo set for candidate ' + candidateId)
+        .addTag(Constants.LOG_TAG_CANDIDATE_CARD);
       Logger.saveLog();
       result.photoUrl = photoUrl(version.Id);
       return result;
@@ -233,13 +224,15 @@ public with sharing class CandidateCardController {
       Logger.warn(
           'Previous photo not deleted: ' + result.getErrors()[0].getMessage()
         )
-        .addTag(LOG_TAG);
+        .addTag(Constants.LOG_TAG_CANDIDATE_CARD);
     }
   }
 
   @TestVisible
   private static AuraHandledException logAndWrap(String message, Exception ex) {
-    Logger.error(message).setExceptionDetails(ex).addTag(LOG_TAG);
+    Logger.error(message)
+      .setExceptionDetails(ex)
+      .addTag(Constants.LOG_TAG_CANDIDATE_CARD);
     Logger.saveLog();
     return auraError(message + ': ' + ex.getMessage());
   }

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<GenAiFunction xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description
+  >Saves a bookmark of a candidate for a job with the overview, score, reasoning, date and the recruiter&apos;s notes. Only after the recruiter confirms.</description>
+    <developerName>Bookmark_Candidate</developerName>
+    <invocationTarget>AgentBookmarkCandidate</invocationTarget>
+    <invocationTargetType>apex</invocationTargetType>
+    <isConfirmationRequired>true</isConfirmationRequired>
+    <isIncludeInProgressIndicator>false</isIncludeInProgressIndicator>
+    <localDeveloperName>Bookmark_Candidate</localDeveloperName>
+    <masterLabel>Bookmark Candidate</masterLabel>
+</GenAiFunction>

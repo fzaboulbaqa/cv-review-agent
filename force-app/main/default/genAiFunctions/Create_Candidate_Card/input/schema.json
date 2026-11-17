@@ -1,0 +1,20 @@
+{
+  "unevaluatedProperties": false,
+  "properties": {
+    "candidateIds": {
+      "title": "Candidate IDs",
+      "description": "The candidates whose card to create, separated by commas. Use Find Candidates to get them. Leave empty when a job id is given.",
+      "lightning:type": "lightning__textType",
+      "lightning:isPII": false,
+      "copilotAction:isUserInput": false
+    },
+    "jobId": {
+      "title": "Job ID",
+      "description": "Optional. Creates the cards of all applicants of this job whose card was not created from their CV yet.",
+      "lightning:type": "lightning__textType",
+      "lightning:isPII": false,
+      "copilotAction:isUserInput": false
+    }
+  },
+  "lightning:type": "lightning__objectType"
+}

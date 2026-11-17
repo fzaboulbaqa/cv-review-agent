@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<GenAiFunction xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description
+  >Ranks the applicants of a job with the scoring rules (must-have skills 60, nice-to-have 20, experience 20), explains each score, and recommends one or more candidates with strengths, concerns, trade-offs and the gaps to check in interview. If no one is a strong match, gives the best available option and the risks.</description>
+    <developerName>Compare_and_Recommend_Candidates</developerName>
+    <invocationTarget>AgentCompareCandidates</invocationTarget>
+    <invocationTargetType>apex</invocationTargetType>
+    <isConfirmationRequired>false</isConfirmationRequired>
+    <isIncludeInProgressIndicator>false</isIncludeInProgressIndicator>
+    <localDeveloperName>Compare_and_Recommend_Candidates</localDeveloperName>
+    <masterLabel>Compare and Recommend Candidates</masterLabel>
+</GenAiFunction>

@@ -1,0 +1,21 @@
+{
+  "required": ["applicantId"],
+  "unevaluatedProperties": false,
+  "properties": {
+    "applicantId": {
+      "title": "Applicant ID",
+      "description": "The application (Job Applicant) id, given in the comparison or by Find Candidates with a job.",
+      "lightning:type": "lightning__textType",
+      "lightning:isPII": false,
+      "copilotAction:isUserInput": false
+    },
+    "notes": {
+      "title": "Notes",
+      "description": "The recruiter's notes for the bookmark. Ask for them before bookmarking.",
+      "lightning:type": "lightning__textType",
+      "lightning:isPII": false,
+      "copilotAction:isUserInput": true
+    }
+  },
+  "lightning:type": "lightning__objectType"
+}

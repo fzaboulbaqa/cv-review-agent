@@ -1,0 +1,39 @@
+name: CV Review Agent Tests
+description: "Actions and outcomes of the CV Review Agent on the demo data. Routing is checked by the actions called: the new builder sometimes reports its router (agent_router) as the topic, so the topic check alone is not reliable."
+subjectType: AGENT
+subjectName: CV_Review_Agent
+testCases:
+  - utterance: "Create the candidate card of Karim El Fassi"
+    expectedTopic: Candidate_Cards
+    expectedActions:
+      - Find_Candidates
+      - Create_Candidate_Card
+    expectedOutcome: "The agent reports the card of Karim El Fassi: fields filled, skills added, and the missing, inferred and conflicting values. It does not show record ids."
+  - utterance: "What does Karim El Fassi's CV say about his years of experience?"
+    expectedTopic: Candidate_Questions
+    expectedActions:
+      - Find_Candidates
+      - Answer_Question_About_Candidates
+    expectedOutcome: "The agent quotes the CV (10 years stated) and mentions that the job dates give fewer years. It does not invent anything."
+  - utterance: "Who has worked with Docker among the applicants of the Senior Salesforce Developer job?"
+    expectedTopic: Candidate_Questions
+    expectedActions:
+      - Find_Jobs
+      - Answer_Question_About_Candidates
+    expectedOutcome: "The agent names the applicants whose CV mentions Docker, with a quote, and says there is no evidence for the others."
+  - utterance: "Compare the applicants for the Senior Salesforce Developer job"
+    expectedTopic: Compare_Recommend_and_Bookmark
+    expectedActions:
+      - Find_Jobs
+      - Compare_and_Recommend_Candidates
+    expectedOutcome: "The agent recommends one or more candidates, shows the ranking with scores and match levels, explains trade-offs and gaps, and offers to bookmark a candidate."
+  - utterance: "Compare the applicants for the Data Analyst job"
+    expectedTopic: Compare_Recommend_and_Bookmark
+    expectedActions:
+      - Find_Jobs
+      - Compare_and_Recommend_Candidates
+    expectedOutcome: "The agent shows the ranking. If no applicant scores 75 or more it says there is no strong match, gives the best available option and the gaps to check in interview."
+  - utterance: "What's the weather in Paris today?"
+    expectedTopic: off_topic
+    expectedActions: []
+    expectedOutcome: "The agent does not answer the weather question and redirects to what it can help with."

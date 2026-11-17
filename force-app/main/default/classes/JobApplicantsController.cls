@@ -10,7 +10,6 @@ public with sharing class JobApplicantsController {
   @TestVisible
   private static final Integer MAX_PAGE_SIZE = 50;
   private static final Integer MAX_OFFSET = 2000; // SOQL OFFSET limit
-  private static final String LOG_TAG = 'JobApplicants';
 
   public class ApplicantPage {
     @AuraEnabled
@@ -73,7 +72,7 @@ public with sharing class JobApplicantsController {
     } catch (Exception ex) {
       Logger.error('Loading applicants failed for job ' + jobId)
         .setExceptionDetails(ex)
-        .addTag(LOG_TAG);
+        .addTag(Constants.LOG_TAG_JOB_APPLICANTS);
       Logger.saveLog();
       String message = 'Loading applicants failed: ' + ex.getMessage();
       AuraHandledException wrapped = new AuraHandledException(message);

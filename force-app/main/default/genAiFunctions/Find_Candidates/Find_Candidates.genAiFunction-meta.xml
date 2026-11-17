@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<GenAiFunction xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description
+  >Finds candidates by name, title or skill, or lists the applicants of a job. Returns their ids.</description>
+    <developerName>Find_Candidates</developerName>
+    <invocationTarget>AgentFindCandidates</invocationTarget>
+    <invocationTargetType>apex</invocationTargetType>
+    <isConfirmationRequired>false</isConfirmationRequired>
+    <isIncludeInProgressIndicator>false</isIncludeInProgressIndicator>
+    <localDeveloperName>Find_Candidates</localDeveloperName>
+    <masterLabel>Find Candidates</masterLabel>
+</GenAiFunction>

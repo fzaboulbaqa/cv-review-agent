@@ -2,54 +2,45 @@
 private class JobApplicantsControllerTest {
   @TestSetup
   static void setup() {
-    Job__c job = new Job__c(Name = 'Salesforce Developer');
-    Skill__c apex = new Skill__c(Name = 'Apex');
-    insert new List<SObject>{ job, apex };
+    Job__c job = TestDataFactory.createJob('Salesforce Developer');
 
     // Scores: 90, 40, unscored. Expected order: Alice (90), Bob (40), Cara (no score).
-    Candidate__c alice = new Candidate__c(
-      Name = 'Alice',
-      Email__c = 'alice@test.cvreview',
-      Current_Title__c = 'Developer',
-      Years_Experience__c = 6
-    );
-    Candidate__c bob = new Candidate__c(
-      Name = 'Bob',
-      Email__c = 'bob@test.cvreview'
-    );
-    Candidate__c cara = new Candidate__c(
-      Name = 'Cara',
-      Email__c = 'cara@test.cvreview'
-    );
+    Candidate__c alice = TestDataFactory.newCandidate('Alice');
+    alice.Current_Title__c = 'Developer';
+    alice.Years_Experience__c = 6;
+    Candidate__c bob = TestDataFactory.newCandidate('Bob');
+    Candidate__c cara = TestDataFactory.newCandidate('Cara');
     insert new List<Candidate__c>{ alice, bob, cara };
+    TestDataFactory.addCandidateSkills(alice.Id, new List<String>{ 'Apex' });
 
-    insert new List<SObject>{
-      new Job_Applicant__c(
-        Candidate__c = bob.Id,
-        Job__c = job.Id,
-        Score__c = 40
+    Job_Applicant__c bobApplication = TestDataFactory.newApplicant(
+      job.Id,
+      bob.Id
+    );
+    bobApplication.Score__c = 40;
+    Job_Applicant__c aliceApplication = TestDataFactory.newApplicant(
+      job.Id,
+      alice.Id
+    );
+    aliceApplication.Score__c = 90;
+    insert new List<Job_Applicant__c>{
+      bobApplication,
+      TestDataFactory.newApplicant(job.Id, cara.Id),
+      aliceApplication
+    };
+    insert new List<Extraction_Flag__c>{
+      TestDataFactory.newFlag(bob.Id, Constants.FLAG_MISSING, 'Phone', null),
+      TestDataFactory.newFlag(
+        bob.Id,
+        Constants.FLAG_MISSING,
+        'Education',
+        null
       ),
-      new Job_Applicant__c(Candidate__c = cara.Id, Job__c = job.Id),
-      new Job_Applicant__c(
-        Candidate__c = alice.Id,
-        Job__c = job.Id,
-        Score__c = 90
-      ),
-      new Candidate_Skill__c(Candidate__c = alice.Id, Skill__c = apex.Id),
-      new Extraction_Flag__c(
-        Candidate__c = bob.Id,
-        Type__c = 'Missing',
-        Field__c = 'Phone__c'
-      ),
-      new Extraction_Flag__c(
-        Candidate__c = bob.Id,
-        Type__c = 'Missing',
-        Field__c = 'Education__c'
-      ),
-      new Extraction_Flag__c(
-        Candidate__c = bob.Id,
-        Type__c = 'Conflict',
-        Field__c = 'Years_Experience__c'
+      TestDataFactory.newFlag(
+        bob.Id,
+        Constants.FLAG_CONFLICT,
+        'Years of Experience',
+        null
       )
     };
   }
@@ -119,8 +110,7 @@ private class JobApplicantsControllerTest {
 
   @IsTest
   static void jobWithoutApplicantsReturnsEmptyPage() {
-    Job__c empty = new Job__c(Name = 'Empty Job');
-    insert empty;
+    Job__c empty = TestDataFactory.createJob('Empty Job');
 
     JobApplicantsController.ApplicantPage page = JobApplicantsController.getApplicants(
       empty.Id,

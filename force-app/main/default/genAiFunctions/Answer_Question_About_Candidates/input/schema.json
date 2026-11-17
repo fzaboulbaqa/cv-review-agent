@@ -1,0 +1,28 @@
+{
+  "required": ["question"],
+  "unevaluatedProperties": false,
+  "properties": {
+    "candidateIds": {
+      "title": "Candidate IDs",
+      "description": "Optional. The candidates the question is about, separated by commas.",
+      "lightning:type": "lightning__textType",
+      "lightning:isPII": false,
+      "copilotAction:isUserInput": false
+    },
+    "jobId": {
+      "title": "Job ID",
+      "description": "Optional. Ask about all applicants of this job (used when no candidate ids are given).",
+      "lightning:type": "lightning__textType",
+      "lightning:isPII": false,
+      "copilotAction:isUserInput": false
+    },
+    "question": {
+      "title": "Question",
+      "description": "The recruiter's question, as asked.",
+      "lightning:type": "lightning__textType",
+      "lightning:isPII": false,
+      "copilotAction:isUserInput": false
+    }
+  },
+  "lightning:type": "lightning__objectType"
+}

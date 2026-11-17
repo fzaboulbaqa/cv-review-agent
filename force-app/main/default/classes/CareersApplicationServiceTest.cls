@@ -2,13 +2,11 @@
 private class CareersApplicationServiceTest {
   @TestSetup
   static void setup() {
-    insert new List<Job__c>{
-      new Job__c(
-        Name = 'Salesforce Developer',
-        Due_Date__c = Date.today().addDays(10)
-      ),
-      new Job__c(Name = 'Closed Job', Due_Date__c = Date.today().addDays(-1))
-    };
+    Job__c open = TestDataFactory.newJob('Salesforce Developer');
+    open.Due_Date__c = Date.today().addDays(10);
+    Job__c closed = TestDataFactory.newJob('Closed Job');
+    closed.Due_Date__c = Date.today().addDays(-1);
+    insert new List<Job__c>{ open, closed };
   }
 
   @IsTest
@@ -62,11 +60,9 @@ private class CareersApplicationServiceTest {
 
   @IsTest
   static void reusesCandidateByEmailWithoutOverwritingIt() {
-    Candidate__c existing = new Candidate__c(
-      Name = 'Nadia K.',
-      Email__c = 'nadia@test.cvreview',
-      Phone__c = '+48 1'
-    );
+    Candidate__c existing = TestDataFactory.newCandidate('Nadia K.');
+    existing.Email__c = 'nadia@test.cvreview';
+    existing.Phone__c = '+48 1';
     insert existing;
 
     CareersApplicationService.Result result = new CareersApplicationService()

@@ -12,8 +12,6 @@ public with sharing class CareersController {
   @TestVisible
   private static final Integer PAGE_SIZE = 10;
   private static final Integer MAX_OFFSET = 2000; // SOQL OFFSET limit
-  private static final String MUST_HAVE = 'Must Have';
-  private static final String LOG_TAG = 'Careers';
 
   public class JobSummary {
     @AuraEnabled
@@ -214,7 +212,7 @@ public with sharing class CareersController {
       detail.job = toSummary(jobs[0]);
       detail.description = jobs[0].Description__c;
       for (Job_Skill__c jobSkill : jobs[0].Job_Skills__r) {
-        (jobSkill.Importance__c == MUST_HAVE
+        (jobSkill.Importance__c == Constants.IMPORTANCE_MUST_HAVE
             ? detail.mustHaveSkills
             : detail.niceToHaveSkills)
           .add(jobSkill.Skill__r.Name);
@@ -266,7 +264,9 @@ public with sharing class CareersController {
 
   /** Logs the real error, shows the visitor a generic one (no internals on a public site). */
   private static AuraHandledException logAndHide(String message, Exception ex) {
-    Logger.error(message).setExceptionDetails(ex).addTag(LOG_TAG);
+    Logger.error(message)
+      .setExceptionDetails(ex)
+      .addTag(Constants.LOG_TAG_CAREERS);
     Logger.saveLog();
     return auraError('Something went wrong. Please try again later.');
   }
