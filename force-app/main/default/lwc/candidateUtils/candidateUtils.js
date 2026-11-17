@@ -3,12 +3,26 @@
  * Score levels are display-only: the score itself comes from ScoringService.
  */
 const SCORE_LEVELS = [
-  { min: 75, label: "Strong match", badgeClass: "slds-theme_success" },
-  { min: 50, label: "Partial match", badgeClass: "slds-theme_warning" },
-  { min: 0, label: "Weak match", badgeClass: "slds-theme_error" }
+  {
+    min: 75,
+    key: "strong",
+    label: "Strong match",
+    badgeClass: "slds-theme_success"
+  },
+  {
+    min: 50,
+    key: "partial",
+    label: "Partial match",
+    badgeClass: "slds-theme_warning"
+  },
+  { min: 0, key: "weak", label: "Weak match", badgeClass: "slds-theme_error" }
 ];
 
-const NOT_SCORED = { label: "Not scored", badgeClass: "slds-badge_lightest" };
+const NOT_SCORED = {
+  key: "none",
+  label: "Not scored",
+  badgeClass: "slds-badge_lightest"
+};
 
 export const NOT_FOUND_TEXT = "Not found in CV";
 

@@ -29,11 +29,26 @@ public with sharing class CandidateCardController {
     public Integer inferredCount = 0;
     @AuraEnabled
     public Integer conflictCount = 0;
+    /** The flags themselves, shown in the card's Data quality section. */
+    @AuraEnabled
+    public List<Flag> flags = new List<Flag>();
     /** Set only in a job's applicant list: a score belongs to one application, not to the candidate. */
     @AuraEnabled
     public Id applicantId;
     @AuraEnabled
     public Decimal score;
+  }
+
+  /** A Missing / Inferred / Conflict flag left by the CV extraction. */
+  public class Flag {
+    @AuraEnabled
+    public Id flagId;
+    @AuraEnabled
+    public String type;
+    @AuraEnabled
+    public String field;
+    @AuraEnabled
+    public String detail;
   }
 
   /** Result of a photo upload: the new photo URL, or an error to show (the upload is then removed). */
@@ -102,22 +117,26 @@ public with sharing class CandidateCardController {
         .skills.add(candidateSkill.Skill__r.Name);
     }
 
-    for (AggregateResult row : [
-      SELECT Candidate__c candidateId, Type__c flagType, COUNT(Id) flagCount
+    for (Extraction_Flag__c row : [
+      SELECT Id, Candidate__c, Type__c, Field__c, Detail__c
       FROM Extraction_Flag__c
       WHERE Candidate__c IN :foundIds
       WITH USER_MODE
-      GROUP BY Candidate__c, Type__c
+      ORDER BY Type__c, Field__c
     ]) {
-      Card card = cards.get((Id) row.get('candidateId'));
-      Integer count = (Integer) row.get('flagCount');
-      String flagType = (String) row.get('flagType');
-      if (flagType == Constants.FLAG_MISSING) {
-        card.missingCount = count;
-      } else if (flagType == Constants.FLAG_INFERRED) {
-        card.inferredCount = count;
-      } else if (flagType == Constants.FLAG_CONFLICT) {
-        card.conflictCount = count;
+      Card card = cards.get(row.Candidate__c);
+      Flag flag = new Flag();
+      flag.flagId = row.Id;
+      flag.type = row.Type__c;
+      flag.field = row.Field__c;
+      flag.detail = row.Detail__c;
+      card.flags.add(flag);
+      if (row.Type__c == Constants.FLAG_MISSING) {
+        card.missingCount++;
+      } else if (row.Type__c == Constants.FLAG_INFERRED) {
+        card.inferredCount++;
+      } else if (row.Type__c == Constants.FLAG_CONFLICT) {
+        card.conflictCount++;
       }
     }
     return cards;

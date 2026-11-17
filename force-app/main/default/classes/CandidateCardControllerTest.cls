@@ -47,6 +47,17 @@ private class CandidateCardControllerTest {
     Assert.areEqual(1, card.missingCount);
     Assert.areEqual(1, card.inferredCount);
     Assert.areEqual(0, card.conflictCount);
+    Assert.areEqual(2, card.flags.size());
+    Map<String, CandidateCardController.Flag> flagsByType = new Map<String, CandidateCardController.Flag>();
+    for (CandidateCardController.Flag flag : card.flags) {
+      flagsByType.put(flag.type, flag);
+    }
+    Assert.areEqual('Skills', flagsByType.get(Constants.FLAG_INFERRED).field);
+    Assert.areEqual(
+      'LWC inferred.',
+      flagsByType.get(Constants.FLAG_INFERRED).detail
+    );
+    Assert.areEqual('Phone', flagsByType.get(Constants.FLAG_MISSING).field);
     // The score belongs to an application, so the candidate's own card has none.
     Assert.isNull(card.applicantId);
     Assert.isNull(card.score);

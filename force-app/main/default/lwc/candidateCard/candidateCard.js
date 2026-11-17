@@ -13,32 +13,40 @@ import {
   subtitle
 } from "c/candidateUtils";
 
-const MAX_SKILLS_SHOWN = 5;
+const MAX_SKILLS_SHOWN = 5; // list tile
+const PAGE_SKILLS_SHOWN = 10; // record page, before "Show more"
 const PHOTO_FORMATS = [".png", ".jpg", ".jpeg", ".gif", ".webp"];
+// Display order: what needs the recruiter's attention first.
 const FLAG_TYPES = [
   {
+    type: "Conflict",
+    key: "conflict",
+    countField: "conflictCount",
+    hint: "The CV and the record disagree: the record value is kept."
+  },
+  {
     type: "Missing",
+    key: "missing",
     countField: "missingCount",
-    badgeClass: "slds-theme_warning"
+    hint: "Not found in the CV nor on the record."
   },
   {
     type: "Inferred",
+    key: "inferred",
     countField: "inferredCount",
-    badgeClass: "slds-badge_inverse"
-  },
-  {
-    type: "Conflict",
-    countField: "conflictCount",
-    badgeClass: "slds-theme_error"
+    hint: "Not stated in the CV, deduced from it: to confirm."
   }
 ];
 
 /**
- * Compact Candidate Card. Two ways to use it:
- *  - In a list: the parent passes the data in `candidate` (see jobApplicants). The name links to
- *    the candidate, the score and "View application" show when the data has an application.
+ * Candidate Card. Two ways to use it:
+ *  - In a list: the parent passes the data in `candidate` (see jobApplicants). A compact tile: the
+ *    name links to the candidate, the score and "View application" show when the data has an
+ *    application, the first skills and the flag counts as pills.
  *  - On the Candidate record page: no `candidate` given, so the card loads itself from `recordId`,
- *    reloads when the record is saved, and offers the photo upload.
+ *    reloads when the record is saved, and offers the photo upload. A standard card with two
+ *    collapsible sections: the skills (first 10, then "Show more"), and the data quality,
+ *    collapsed by default (each Missing / Inferred / Conflict flag with its field and detail).
  */
 export default class CandidateCard extends NavigationMixin(LightningElement) {
   @api recordId;
@@ -48,6 +56,9 @@ export default class CandidateCard extends NavigationMixin(LightningElement) {
   error;
   isLoading = false;
   isPhotoUploadOpen = false;
+  // Skills open, Data quality collapsed (its pills above already give the counts).
+  openSections = ["skills"];
+  showAllSkills = false;
   photoFormats = PHOTO_FORMATS;
   lastModified;
 
@@ -95,13 +106,12 @@ export default class CandidateCard extends NavigationMixin(LightningElement) {
     const hasYears =
       data.yearsExperience !== null && data.yearsExperience !== undefined;
     const skills = data.skills || [];
-    const extraSkills = skills.length - MAX_SKILLS_SHOWN;
-    const flags = FLAG_TYPES.filter((flag) => data[flag.countField] > 0).map(
-      (flag) => ({
-        type: flag.type,
-        badgeClass: flag.badgeClass,
-        label: `${data[flag.countField]} ${flag.type}`
-      })
+    const extraSkills = skills.slice(MAX_SKILLS_SHOWN);
+    const flagDetails = data.flags || [];
+    const present = FLAG_TYPES.filter((flag) => data[flag.countField] > 0);
+    const flagTotal = present.reduce(
+      (total, flag) => total + data[flag.countField],
+      0
     );
 
     return {
@@ -112,25 +122,57 @@ export default class CandidateCard extends NavigationMixin(LightningElement) {
       years: hasYears
         ? `${data.yearsExperience} years of experience`
         : `Years of experience: ${NOT_FOUND_TEXT}`,
-      yearsClass: hasYears
-        ? "slds-text-body_small"
-        : "slds-text-body_small missing",
+      yearsClass: hasYears ? "years" : "years missing",
       // A score belongs to an application, so it only shows in a job's applicant list.
       hasApplication: Boolean(data.applicantId),
       scoreLabel:
         data.score === null || data.score === undefined ? "-" : data.score,
+      scoreClass: `score score_${level.key}`,
       levelLabel: level.label,
-      badgeClass: level.badgeClass,
+      skills,
       shownSkills: skills.slice(0, MAX_SKILLS_SHOWN),
-      extraSkillsLabel: extraSkills > 0 ? `+${extraSkills}` : null,
+      extraSkillsLabel: extraSkills.length ? `+${extraSkills.length}` : null,
+      extraSkillsTitle: extraSkills.join(", "),
+      pageSkills: this.showAllSkills
+        ? skills
+        : skills.slice(0, PAGE_SKILLS_SHOWN),
+      hasMoreSkills: skills.length > PAGE_SKILLS_SHOWN,
+      moreSkillsLabel: this.showAllSkills
+        ? "Show less"
+        : `Show more (${skills.length - PAGE_SKILLS_SHOWN})`,
       hasSkills: skills.length > 0,
-      flags,
-      hasFlags: flags.length > 0
+      skillsSectionLabel: `Skills (${skills.length})`,
+      flagCounts: present.map((flag) => ({
+        type: flag.type,
+        pillClass: `pill pill_${flag.key}`,
+        label: `${data[flag.countField]} ${flag.type}`
+      })),
+      flagGroups: present
+        .map((flag) => ({
+          type: flag.type,
+          hint: flag.hint,
+          pillClass: `pill pill_${flag.key}`,
+          groupClass: `flag-group flag-group_${flag.key}`,
+          items: flagDetails
+            .filter((item) => item.type === flag.type)
+            .map((item, index) => ({
+              key: item.flagId || `${flag.type}-${index}`,
+              field: item.field || "General",
+              detail: item.detail
+            }))
+        }))
+        .filter((group) => group.items.length > 0),
+      hasFlags: flagTotal > 0,
+      qualitySectionLabel: `Data quality (${flagTotal})`
     };
   }
 
   get photoButtonLabel() {
     return this.view?.photoUrl ? "Change photo" : "Add photo";
+  }
+
+  toggleAllSkills() {
+    this.showAllSkills = !this.showAllSkills;
   }
 
   togglePhotoUpload() {
