@@ -47,3 +47,6 @@ $RECYCLE.BIN/
 # Local editor settings and docs
 .vscode/
 docs/
+
+# Local scripts
+scripts/
