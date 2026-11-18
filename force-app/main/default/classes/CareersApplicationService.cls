@@ -93,15 +93,15 @@ public without sharing class CareersApplicationService {
       insert new Job_Applicant__c(Candidate__c = candidate.Id, Job__c = job.Id);
       insertFiles(candidate, application);
 
-      Logger.info(
-          'Application received for job ' +
-            job.Id +
-            ' (candidate ' +
-            candidate.Id +
-            ')'
-        )
-        .addTag(Constants.LOG_TAG_CAREERS);
+      String logMessage =
+        'Application received for job ' +
+        job.Id +
+        ' (candidate ' +
+        candidate.Id +
+        ')';
+      Logger.info(logMessage).addTag(Constants.LOG_TAG_CAREERS);
       Logger.saveLog();
+
       result.success = true;
       result.message =
         'Thank you, your application for ' +
@@ -143,18 +143,20 @@ public without sharing class CareersApplicationService {
     if (application.cv == null || String.isBlank(application.cv.base64)) {
       throw new ValidationException('Please upload your CV.');
     }
-    Integer total = checkFile(
+    Integer cvSize = checkFile(
       application.cv,
       CV_EXTENSIONS,
       'Your CV must be a PDF or Word document.'
     );
-    if (total > MAX_CV_BYTES) {
+    if (cvSize > MAX_CV_BYTES) {
       throw new ValidationException('Your CV must be smaller than 2 MB.');
     }
+    Integer total = cvSize;
 
-    List<UploadedFile> otherFiles = application.otherFiles == null
-      ? new List<UploadedFile>()
-      : application.otherFiles;
+    List<UploadedFile> otherFiles = new List<UploadedFile>();
+    if (application.otherFiles != null) {
+      otherFiles = application.otherFiles;
+    }
     if (otherFiles.size() > MAX_OTHER_FILES) {
       throw new ValidationException(
         'You can add up to ' + MAX_OTHER_FILES + ' other documents.'
@@ -190,9 +192,8 @@ public without sharing class CareersApplicationService {
     if (file.fileName.length() > 255) {
       throw new ValidationException('A file name is too long.');
     }
-    if (
-      !extensions.contains(file.fileName.substringAfterLast('.').toLowerCase())
-    ) {
+    String extension = file.fileName.substringAfterLast('.').toLowerCase();
+    if (!extensions.contains(extension)) {
       throw new ValidationException(typeMessage);
     }
     // Base64 is 4 characters per 3 bytes: estimate before decoding to fail fast on huge files.
@@ -220,15 +221,19 @@ public without sharing class CareersApplicationService {
       ORDER BY CreatedDate
       LIMIT 1
     ];
-    return candidates.isEmpty() ? null : candidates[0];
+    if (candidates.isEmpty()) {
+      return null;
+    }
+    return candidates[0];
   }
 
   private Boolean hasApplied(Id candidateId, Id jobId) {
-    return [
-        SELECT COUNT()
-        FROM Job_Applicant__c
-        WHERE Candidate__c = :candidateId AND Job__c = :jobId
-      ] > 0;
+    Integer applicationCount = [
+      SELECT COUNT()
+      FROM Job_Applicant__c
+      WHERE Candidate__c = :candidateId AND Job__c = :jobId
+    ];
+    return applicationCount > 0;
   }
 
   private void insertFiles(Candidate__c candidate, Application application) {
@@ -249,13 +254,11 @@ public without sharing class CareersApplicationService {
     String kind
   ) {
     String fileName = file.fileName.trim();
+    String nameWithoutExtension = fileName.substringBeforeLast('.');
+    // Example: "CV - Sara Haddad - resume". Salesforce titles are at most 255 characters.
+    String title = kind + ' - ' + candidate.Name + ' - ' + nameWithoutExtension;
     return new ContentVersion(
-      Title = (kind +
-        ' - ' +
-        candidate.Name +
-        ' - ' +
-        fileName.substringBeforeLast('.'))
-        .left(255),
+      Title = title.left(255),
       PathOnClient = fileName,
       VersionData = EncodingUtil.base64Decode(file.base64),
       FirstPublishLocationId = candidate.Id
@@ -278,6 +281,9 @@ public without sharing class CareersApplicationService {
   }
 
   private String trimToNull(String value) {
-    return String.isBlank(value) ? null : value.trim();
+    if (String.isBlank(value)) {
+      return null;
+    }
+    return value.trim();
   }
 }

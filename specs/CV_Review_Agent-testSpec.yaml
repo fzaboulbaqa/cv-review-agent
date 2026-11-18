@@ -3,31 +3,31 @@ description: "Actions and outcomes of the CV Review Agent on the demo data. Rout
 subjectType: AGENT
 subjectName: CV_Review_Agent
 testCases:
-  - utterance: "Create the candidate card of Karim El Fassi"
+  - utterance: "Create the candidate card of Sofia Rossi"
     expectedTopic: Candidate_Cards
     expectedActions:
       - Find_Candidates
       - Create_Candidate_Card
-    expectedOutcome: "The agent reports the card of Karim El Fassi: fields filled, skills added, and the missing, inferred and conflicting values. It does not show record ids."
-  - utterance: "What does Karim El Fassi's CV say about his years of experience?"
+    expectedOutcome: "The agent reports the card of Sofia Rossi: fields filled, skills added, and the missing, inferred and conflicting values. It does not show record ids."
+  - utterance: "What does Claire Dubois's CV say about her years of experience?"
     expectedTopic: Candidate_Questions
     expectedActions:
       - Find_Candidates
       - Answer_Question_About_Candidates
-    expectedOutcome: "The agent quotes the CV (10 years stated) and mentions that the job dates give fewer years. It does not invent anything."
-  - utterance: "Who has worked with Docker among the applicants of the Senior Salesforce Developer job?"
+    expectedOutcome: "The agent quotes the CV (8 years stated) and mentions that the job dates give fewer years. It does not invent anything."
+  - utterance: "Who has used Prompt Builder among the applicants of the Senior Salesforce Developer - Agentforce job?"
     expectedTopic: Candidate_Questions
     expectedActions:
       - Find_Jobs
       - Answer_Question_About_Candidates
-    expectedOutcome: "The agent names the applicants whose CV mentions Docker, with a quote, and says there is no evidence for the others."
-  - utterance: "Compare the applicants for the Senior Salesforce Developer job"
+    expectedOutcome: "The agent names the applicants whose CV mentions Prompt Builder, with a quote, and says there is no evidence for the others."
+  - utterance: "Compare the applicants for the Senior Salesforce Developer - Agentforce job"
     expectedTopic: Compare_Recommend_and_Bookmark
     expectedActions:
       - Find_Jobs
       - Compare_and_Recommend_Candidates
     expectedOutcome: "The agent recommends one or more candidates, shows the ranking with scores and match levels, explains trade-offs and gaps, and offers to bookmark a candidate."
-  - utterance: "Compare the applicants for the Data Analyst job"
+  - utterance: "Compare the applicants for the AI Data Engineer job"
     expectedTopic: Compare_Recommend_and_Bookmark
     expectedActions:
       - Find_Jobs

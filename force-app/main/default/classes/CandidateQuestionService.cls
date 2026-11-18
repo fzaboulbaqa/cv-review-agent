@@ -31,11 +31,10 @@ public with sharing class CandidateQuestionService {
     }
     List<Candidate__c> candidates = candidates(candidateIds, jobId);
     if (candidates.isEmpty()) {
-      throw new QuestionException(
-        jobId != null
-          ? 'This job has no applicants yet.'
-          : 'No matching candidate found.'
-      );
+      if (jobId != null) {
+        throw new QuestionException('This job has no applicants yet.');
+      }
+      throw new QuestionException('No matching candidate found.');
     }
 
     Answer result = new Answer();
@@ -52,22 +51,12 @@ public with sharing class CandidateQuestionService {
         cvText = cvText.left(MAX_CV_CHARS) + '\n(CV cut here: too long)';
         notes.add('the CV of ' + candidate.Name + ' was cut');
       }
-      sources.add(
-        '[' +
-          index++ +
-          '] Candidate: ' +
-          candidate.Name +
-          '\n' +
-          'CV text:\n"""\n' +
-          cvText.replace('"""', '\'\'\'') +
-          '\n"""'
-      );
+      sources.add(source(index, candidate.Name, cvText));
+      index++;
     }
-    if (
-      candidateIds.isEmpty() &&
-      jobId == null &&
-      candidates.size() == MAX_CANDIDATES
-    ) {
+
+    Boolean searchedRecentOnly = candidateIds.isEmpty() && jobId == null;
+    if (searchedRecentOnly && candidates.size() == MAX_CANDIDATES) {
       notes.add(
         'only the ' +
           MAX_CANDIDATES +
@@ -75,26 +64,32 @@ public with sharing class CandidateQuestionService {
       );
     }
 
-    result.answer = AiPrompt.run(
-      Constants.TEMPLATE_ANSWER_QUESTION,
-      new Map<String, Object>{
-        'Question' => question.left(2000),
-        'Candidates' => String.join(sources, '\n\n')
-      }
-    );
-    result.note = notes.isEmpty()
-      ? null
-      : 'Note: ' + String.join(notes, '; ') + '.';
+    Map<String, Object> inputs = new Map<String, Object>{
+      'Question' => question.left(2000),
+      'Candidates' => String.join(sources, '\n\n')
+    };
+    result.answer = AiPrompt.run(Constants.TEMPLATE_ANSWER_QUESTION, inputs);
+    if (!notes.isEmpty()) {
+      result.note = 'Note: ' + String.join(notes, '; ') + '.';
+    }
 
-    Logger.info(
-        'Agent answered a question about ' +
-          String.join(result.candidateNames, ', ') +
-          '. Question: ' +
-          question.left(500)
-      )
-      .addTag(Constants.LOG_TAG_AGENT_DECISION);
+    String names = String.join(result.candidateNames, ', ');
+    String message = 'Agent answered a question about ' + names;
+    message += '. Question: ' + question.left(500);
+    Logger.info(message).addTag(Constants.LOG_TAG_AGENT_DECISION);
     Logger.saveLog();
     return result;
+  }
+
+  /** One numbered source for the AI. Triple quotes are escaped so the CV can't close the block. */
+  private static String source(Integer index, String name, String cvText) {
+    List<String> lines = new List<String>();
+    lines.add('[' + index + '] Candidate: ' + name);
+    lines.add('CV text:');
+    lines.add('"""');
+    lines.add(cvText.replace('"""', '\'\'\''));
+    lines.add('"""');
+    return String.join(lines, '\n');
   }
 
   private static List<Candidate__c> candidates(

@@ -45,6 +45,64 @@ public with sharing class CandidateRecommendationService {
   }
 
   public static Recommendation recommend(Id jobId, Set<Id> candidateIds) {
+    Job__c job = loadJob(jobId);
+
+    List<ScoringService.Breakdown> breakdowns = ScoringService.explainApplicants(
+      jobId,
+      candidateIds
+    );
+    if (breakdowns.isEmpty()) {
+      throw new RecommendationException(
+        'The job "' + job.Name + '" has no matching applicants to compare.'
+      );
+    }
+    Map<Id, Candidate__c> candidates = candidates(breakdowns);
+    breakdowns.sort(new ByScore(candidates));
+
+    Recommendation result = new Recommendation();
+    result.jobName = job.Name;
+    for (ScoringService.Breakdown breakdown : breakdowns) {
+      Integer rank = result.ranking.size() + 1;
+      String candidateName = candidates.get(breakdown.candidateId).Name;
+      result.ranking.add(toRanked(breakdown, rank, candidateName));
+    }
+    Ranked top = result.ranking[0];
+    result.topApplicantId = top.applicantId;
+    result.hasStrongMatch = top.score >= Constants.MATCH_STRONG_SCORE;
+
+    // 1. AI first (no DML before a callout).
+    Map<Id, String> aiReasoning = askAi(job, result, candidates);
+    if (!result.aiAvailable) {
+      result.recommendation =
+        'The AI recommendation is not available right now. The ranking below comes from the ' +
+        'scoring rules only.';
+    }
+
+    // 2. Save scores and missing reasonings, only for candidates whose card was filled from a
+    // CV: a score is locked once saved, and an empty card would lock a score of 0.
+    List<ScoringService.Breakdown> ready = new List<ScoringService.Breakdown>();
+    for (ScoringService.Breakdown breakdown : breakdowns) {
+      Candidate__c candidate = candidates.get(breakdown.candidateId);
+      if (String.isNotBlank(candidate.CV_Text__c)) {
+        ready.add(breakdown);
+      } else {
+        aiReasoning.remove(breakdown.jobApplicantId);
+      }
+    }
+    ScoringService.saveScores(ready);
+    saveReasoning(result.ranking, aiReasoning);
+
+    String message = 'Agent decision: recommendation for job ' + job.Name;
+    message += ' (' + jobId + ').';
+    message += ' Ranking: ' + rankingLine(result.ranking) + '.';
+    message += ' Strong match: ' + result.hasStrongMatch + '.';
+    message += ' AI text: ' + result.aiAvailable;
+    Logger.info(message).addTag(Constants.LOG_TAG_AGENT_DECISION);
+    Logger.saveLog();
+    return result;
+  }
+
+  private static Job__c loadJob(Id jobId) {
     List<Job__c> jobs = [
       SELECT
         Id,
@@ -63,104 +121,76 @@ public with sharing class CandidateRecommendationService {
     if (jobs.isEmpty()) {
       throw new RecommendationException('Job not found or not accessible.');
     }
-    Job__c job = jobs[0];
+    return jobs[0];
+  }
 
-    List<ScoringService.Breakdown> breakdowns = ScoringService.explainApplicants(
-      jobId,
-      candidateIds
-    );
-    if (breakdowns.isEmpty()) {
-      throw new RecommendationException(
-        'The job "' + job.Name + '" has no matching applicants to compare.'
-      );
+  private static Ranked toRanked(
+    ScoringService.Breakdown breakdown,
+    Integer rank,
+    String candidateName
+  ) {
+    Ranked ranked = new Ranked();
+    ranked.rank = rank;
+    ranked.applicantId = breakdown.jobApplicantId;
+    ranked.candidateId = breakdown.candidateId;
+    ranked.candidateName = candidateName;
+    ranked.score = breakdown.score;
+    ranked.matchLevel = Constants.matchLevel(breakdown.score);
+    ranked.breakdown = explain(breakdown);
+    return ranked;
+  }
+
+  /**
+   * Asks the AI for the recommendation text (set on the result) and returns the reasoning it
+   * wrote per applicant. If the AI fails, the error is logged and nothing is thrown.
+   */
+  private static Map<Id, String> askAi(
+    Job__c job,
+    Recommendation result,
+    Map<Id, Candidate__c> candidates
+  ) {
+    Set<Id> rankedApplicantIds = new Set<Id>();
+    for (Ranked ranked : result.ranking) {
+      rankedApplicantIds.add(ranked.applicantId);
     }
-    Map<Id, Candidate__c> candidates = candidates(breakdowns);
-    breakdowns.sort(new ByScore(candidates));
 
-    Recommendation result = new Recommendation();
-    result.jobName = job.Name;
-    Map<Id, ScoringService.Breakdown> breakdownByApplicant = new Map<Id, ScoringService.Breakdown>();
-    for (ScoringService.Breakdown breakdown : breakdowns) {
-      Ranked ranked = new Ranked();
-      ranked.rank = result.ranking.size() + 1;
-      ranked.applicantId = breakdown.jobApplicantId;
-      ranked.candidateId = breakdown.candidateId;
-      ranked.candidateName = candidates.get(breakdown.candidateId).Name;
-      ranked.score = breakdown.score;
-      ranked.matchLevel = Constants.matchLevel(breakdown.score);
-      ranked.breakdown = explain(breakdown);
-      result.ranking.add(ranked);
-      breakdownByApplicant.put(breakdown.jobApplicantId, breakdown);
-    }
-    result.topApplicantId = result.ranking[0].applicantId;
-    result.hasStrongMatch =
-      result.ranking[0].score >= Constants.MATCH_STRONG_SCORE;
-
-    // 1. AI first (no DML before a callout).
     Map<Id, String> aiReasoning = new Map<Id, String>();
     try {
-      Map<String, Object> answer = AiPrompt.parseJsonObject(
-        AiPrompt.run(
-          Constants.TEMPLATE_RECOMMEND,
-          new Map<String, Object>{
-            'Job' => describeJob(job),
-            'Applicants' => describeApplicants(result.ranking, candidates)
-          }
-        )
-      );
+      Map<String, Object> inputs = new Map<String, Object>{
+        'Job' => describeJob(job),
+        'Applicants' => describeApplicants(result.ranking, candidates)
+      };
+      String rawAnswer = AiPrompt.run(Constants.TEMPLATE_RECOMMEND, inputs);
+      Map<String, Object> answer = AiPrompt.parseJsonObject(rawAnswer);
+
       String text = AiPrompt.text(answer, 'recommendation');
-      result.recommendation = text == null
-        ? null
-        : AiPrompt.withoutCourtesy(text);
+      if (text != null) {
+        result.recommendation = AiPrompt.withoutCourtesy(text);
+      }
       result.aiAvailable = result.recommendation != null;
+
       for (Map<String, Object> item : AiPrompt.objects(answer, 'applicants')) {
         Id applicantId = toId(AiPrompt.text(item, 'applicantId'));
         String reasoning = AiPrompt.text(item, 'reasoning');
         // Only Ids we sent: the AI can't attach a reasoning to another record.
-        if (
-          applicantId != null &&
-          breakdownByApplicant.containsKey(applicantId) &&
-          reasoning != null
-        ) {
+        Boolean isKnownApplicant = rankedApplicantIds.contains(applicantId);
+        if (applicantId != null && isKnownApplicant && reasoning != null) {
           aiReasoning.put(applicantId, reasoning);
         }
       }
     } catch (Exception ex) {
-      Logger.error('AI recommendation failed for job ' + jobId)
+      Logger.error('AI recommendation failed for job ' + job.Id)
         .setExceptionDetails(ex)
         .addTag(Constants.LOG_TAG_AGENT_DECISION);
     }
-    if (!result.aiAvailable) {
-      result.recommendation =
-        'The AI recommendation is not available right now. The ranking below comes from the ' +
-        'scoring rules only.';
-    }
-
-    // 2. Save scores and missing reasonings.
-    ScoringService.saveScores(breakdowns);
-    saveReasoning(result.ranking, aiReasoning);
-
-    Logger.info(
-        'Agent decision: recommendation for job ' +
-          job.Name +
-          ' (' +
-          jobId +
-          '). Ranking: ' +
-          rankingLine(result.ranking) +
-          '. Strong match: ' +
-          result.hasStrongMatch +
-          '. AI text: ' +
-          result.aiAvailable
-      )
-      .addTag(Constants.LOG_TAG_AGENT_DECISION);
-    Logger.saveLog();
-    return result;
+    return aiReasoning;
   }
 
   /** The score, criterion by criterion, in plain words (explainability). */
   @TestVisible
   private static String explain(ScoringService.Breakdown breakdown) {
     List<String> lines = new List<String>();
+
     Integer mustTotal =
       breakdown.matchedMustHave.size() + breakdown.missingMustHave.size();
     if (mustTotal > 0) {
@@ -172,6 +202,7 @@ public with sharing class CandidateRecommendationService {
         )
       );
     }
+
     Integer niceTotal =
       breakdown.matchedNiceToHave.size() + breakdown.missingNiceToHave.size();
     if (niceTotal > 0) {
@@ -183,17 +214,14 @@ public with sharing class CandidateRecommendationService {
         )
       );
     }
+
     if (breakdown.requiredYears != null && breakdown.requiredYears > 0) {
+      String years = yearsText(breakdown.candidateYears);
       lines.add(
-        'Experience: ' +
-          (breakdown.candidateYears == null
-            ? 'not stated in the CV (0 points, check in interview)'
-            : breakdown.candidateYears + ' years') +
-          ' for ' +
-          breakdown.requiredYears +
-          ' required'
+        'Experience: ' + years + ' for ' + breakdown.requiredYears + ' required'
       );
     }
+
     if (lines.isEmpty()) {
       lines.add(
         'The job has no skills or minimum experience to score against.'
@@ -202,9 +230,19 @@ public with sharing class CandidateRecommendationService {
     return String.join(lines, '\n');
   }
 
+  private static String yearsText(Decimal candidateYears) {
+    if (candidateYears == null) {
+      return 'not stated in the CV (0 points, check in interview)';
+    }
+    return candidateYears + ' years';
+  }
+
   private static Id toId(String value) {
+    if (value == null) {
+      return null;
+    }
     try {
-      return value == null ? null : Id.valueOf(value);
+      return Id.valueOf(value);
     } catch (Exception ex) {
       return null;
     }
@@ -223,14 +261,10 @@ public with sharing class CandidateRecommendationService {
     if (!missing.isEmpty()) {
       parts.add('missing ' + String.join(missing, ', '));
     }
-    return label +
-      ': ' +
-      matched.size() +
-      ' of ' +
-      (matched.size() + missing.size()) +
-      ' (' +
-      String.join(parts, '; ') +
-      ')';
+    Integer total = matched.size() + missing.size();
+    String counts = matched.size() + ' of ' + total;
+    String details = String.join(parts, '; ');
+    return label + ': ' + counts + ' (' + details + ')';
   }
 
   private static void saveReasoning(
@@ -241,38 +275,22 @@ public with sharing class CandidateRecommendationService {
     for (Ranked ranked : ranking) {
       applicantIds.add(ranked.applicantId);
     }
-    // Long text can't be filtered in SOQL: the empty ones are picked in Apex.
-    Map<Id, Job_Applicant__c> applicants = new Map<Id, Job_Applicant__c>();
-    for (Job_Applicant__c applicant : [
-      SELECT Id, Reasoning__c
-      FROM Job_Applicant__c
-      WHERE Id IN :applicantIds
-      WITH USER_MODE
-    ]) {
-      if (String.isBlank(applicant.Reasoning__c)) {
-        applicants.put(applicant.Id, applicant);
-      }
-    }
+    Set<Id> withoutReasoning = applicantsWithoutReasoning(applicantIds);
+
     List<Job_Applicant__c> updates = new List<Job_Applicant__c>();
     for (Ranked ranked : ranking) {
       // Without the AI text, wait for a later comparison: the reasoning is written once.
-      if (
-        applicants.containsKey(ranked.applicantId) &&
-        aiReasoning.containsKey(ranked.applicantId)
-      ) {
+      Boolean reasoningIsEmpty = withoutReasoning.contains(ranked.applicantId);
+      Boolean hasAiText = aiReasoning.containsKey(ranked.applicantId);
+      if (reasoningIsEmpty && hasAiText) {
+        String reasoning = reasoningText(
+          ranked,
+          aiReasoning.get(ranked.applicantId)
+        );
         updates.add(
           new Job_Applicant__c(
             Id = ranked.applicantId,
-            Reasoning__c = ('Score: ' +
-              ranked.score +
-              ' (' +
-              ranked.matchLevel +
-              ')\n' +
-              'Score breakdown:\n' +
-              ranked.breakdown +
-              '\n\n' +
-              aiReasoning.get(ranked.applicantId))
-              .left(Constants.LONG_TEXT_MAX_LENGTH)
+            Reasoning__c = reasoning
           )
         );
       }
@@ -280,29 +298,62 @@ public with sharing class CandidateRecommendationService {
     update as user updates;
   }
 
+  /** The applicants (among these) whose Reasoning__c is still empty. */
+  private static Set<Id> applicantsWithoutReasoning(Set<Id> applicantIds) {
+    // Long text can't be filtered in SOQL: the empty ones are picked in Apex.
+    Set<Id> result = new Set<Id>();
+    for (Job_Applicant__c applicant : [
+      SELECT Id, Reasoning__c
+      FROM Job_Applicant__c
+      WHERE Id IN :applicantIds
+      WITH USER_MODE
+    ]) {
+      if (String.isBlank(applicant.Reasoning__c)) {
+        result.add(applicant.Id);
+      }
+    }
+    return result;
+  }
+
+  private static String reasoningText(Ranked ranked, String aiText) {
+    List<String> lines = new List<String>();
+    lines.add('Score: ' + ranked.score + ' (' + ranked.matchLevel + ')');
+    lines.add('Score breakdown:');
+    lines.add(ranked.breakdown);
+    lines.add('');
+    lines.add(aiText);
+    String text = String.join(lines, '\n');
+    return text.left(Constants.LONG_TEXT_MAX_LENGTH);
+  }
+
   private static String describeJob(Job__c job) {
     List<String> must = new List<String>();
     List<String> nice = new List<String>();
     for (Job_Skill__c jobSkill : job.Job_Skills__r) {
-      (jobSkill.Importance__c == Constants.IMPORTANCE_MUST_HAVE ? must : nice)
-        .add(jobSkill.Skill__r.Name);
+      if (jobSkill.Importance__c == Constants.IMPORTANCE_MUST_HAVE) {
+        must.add(jobSkill.Skill__r.Name);
+      } else {
+        nice.add(jobSkill.Skill__r.Name);
+      }
     }
-    return 'Job: ' +
-      job.Name +
-      '\n' +
-      'Minimum years of experience: ' +
-      (job.Min_Years_Experience__c == null
-        ? 'none'
-        : String.valueOf(job.Min_Years_Experience__c)) +
-      '\n' +
-      'Must-have skills: ' +
-      (must.isEmpty() ? 'none' : String.join(must, ', ')) +
-      '\n' +
-      'Nice-to-have skills: ' +
-      (nice.isEmpty() ? 'none' : String.join(nice, ', ')) +
-      '\n' +
-      'Description:\n' +
-      (job.Description__c == null ? '(none)' : job.Description__c.left(4000));
+
+    String minYears = 'none';
+    if (job.Min_Years_Experience__c != null) {
+      minYears = String.valueOf(job.Min_Years_Experience__c);
+    }
+    String description = '(none)';
+    if (job.Description__c != null) {
+      description = job.Description__c.left(4000);
+    }
+
+    List<String> lines = new List<String>();
+    lines.add('Job: ' + job.Name);
+    lines.add('Minimum years of experience: ' + minYears);
+    lines.add('Must-have skills: ' + joinOrNone(must, ', '));
+    lines.add('Nice-to-have skills: ' + joinOrNone(nice, ', '));
+    lines.add('Description:');
+    lines.add(description);
+    return String.join(lines, '\n');
   }
 
   private static String describeApplicants(
@@ -315,45 +366,53 @@ public with sharing class CandidateRecommendationService {
         break;
       }
       Candidate__c candidate = candidates.get(ranked.candidateId);
-      String cvText = String.isBlank(candidate.CV_Text__c)
-        ? '(No CV text available.)'
-        : candidate.CV_Text__c.left(MAX_CV_CHARS).replace('"""', '\'\'\'');
-      parts.add(
-        'Rank ' +
-          ranked.rank +
-          ': ' +
-          ranked.candidateName +
-          '\n' +
-          'applicantId: ' +
-          ranked.applicantId +
-          '\n' +
-          'Score: ' +
-          ranked.score +
-          ' of 100 (' +
-          ranked.matchLevel +
-          ')\n' +
-          'Score breakdown:\n' +
-          ranked.breakdown +
-          '\n' +
-          'Data issues on the card: ' +
-          flagSummary(candidate) +
-          '\n' +
-          'CV text:\n"""\n' +
-          cvText +
-          '\n"""'
-      );
+      parts.add(describeApplicant(ranked, candidate));
     }
     return String.join(parts, '\n\n');
+  }
+
+  private static String describeApplicant(
+    Ranked ranked,
+    Candidate__c candidate
+  ) {
+    List<String> lines = new List<String>();
+    lines.add('Rank ' + ranked.rank + ': ' + ranked.candidateName);
+    lines.add('applicantId: ' + ranked.applicantId);
+    lines.add('Score: ' + ranked.score + ' of 100 (' + ranked.matchLevel + ')');
+    lines.add('Score breakdown:');
+    lines.add(ranked.breakdown);
+    lines.add('Data issues on the card: ' + flagSummary(candidate));
+    lines.add('CV text:');
+    lines.add('"""');
+    lines.add(cvTextForAi(candidate));
+    lines.add('"""');
+    return String.join(lines, '\n');
+  }
+
+  /** The CV text, cut, with triple quotes escaped so it can't close the quoted block. */
+  private static String cvTextForAi(Candidate__c candidate) {
+    if (String.isBlank(candidate.CV_Text__c)) {
+      return '(No CV text available.)';
+    }
+    String cvText = candidate.CV_Text__c.left(MAX_CV_CHARS);
+    return cvText.replace('"""', '\'\'\'');
   }
 
   private static String flagSummary(Candidate__c candidate) {
     List<String> items = new List<String>();
     for (Extraction_Flag__c item : candidate.Extraction_Flags__r) {
-      items.add(
-        item.Type__c + ' ' + item.Field__c + ': ' + item.Detail__c.left(200)
-      );
+      String detail = item.Detail__c.left(200);
+      items.add(item.Type__c + ' ' + item.Field__c + ': ' + detail);
     }
-    return items.isEmpty() ? 'none' : String.join(items, ' | ');
+    return joinOrNone(items, ' | ');
+  }
+
+  /** The items joined with the separator, or 'none' when there are none. */
+  private static String joinOrNone(List<String> items, String separator) {
+    if (items.isEmpty()) {
+      return 'none';
+    }
+    return String.join(items, separator);
   }
 
   private static String rankingLine(List<Ranked> ranking) {
@@ -371,23 +430,22 @@ public with sharing class CandidateRecommendationService {
     for (ScoringService.Breakdown breakdown : breakdowns) {
       candidateIds.add(breakdown.candidateId);
     }
-    return new Map<Id, Candidate__c>(
-      [
-        SELECT
-          Id,
-          Name,
-          CV_Text__c,
-          (
-            SELECT Type__c, Field__c, Detail__c
-            FROM Extraction_Flags__r
-            ORDER BY Type__c
-            LIMIT 20
-          )
-        FROM Candidate__c
-        WHERE Id IN :candidateIds
-        WITH USER_MODE
-      ]
-    );
+    List<Candidate__c> records = [
+      SELECT
+        Id,
+        Name,
+        CV_Text__c,
+        (
+          SELECT Type__c, Field__c, Detail__c
+          FROM Extraction_Flags__r
+          ORDER BY Type__c
+          LIMIT 20
+        )
+      FROM Candidate__c
+      WHERE Id IN :candidateIds
+      WITH USER_MODE
+    ];
+    return new Map<Id, Candidate__c>(records);
   }
 
   /** Best score first; ties: more must-have skills, then name. */
@@ -403,13 +461,24 @@ public with sharing class CandidateRecommendationService {
       ScoringService.Breakdown b
     ) {
       if (a.score != b.score) {
-        return a.score > b.score ? -1 : 1;
+        return biggerFirst(a.score, b.score);
       }
-      if (a.matchedMustHave.size() != b.matchedMustHave.size()) {
-        return a.matchedMustHave.size() > b.matchedMustHave.size() ? -1 : 1;
+      Integer mustA = a.matchedMustHave.size();
+      Integer mustB = b.matchedMustHave.size();
+      if (mustA != mustB) {
+        return biggerFirst(mustA, mustB);
       }
-      return candidates.get(a.candidateId)
-        .Name.compareTo(candidates.get(b.candidateId).Name);
+      String nameA = candidates.get(a.candidateId).Name;
+      String nameB = candidates.get(b.candidateId).Name;
+      return nameA.compareTo(nameB);
+    }
+
+    /** Sort order for two different values: the bigger one comes first. */
+    private Integer biggerFirst(Integer first, Integer second) {
+      if (first > second) {
+        return -1;
+      }
+      return 1;
     }
   }
 }

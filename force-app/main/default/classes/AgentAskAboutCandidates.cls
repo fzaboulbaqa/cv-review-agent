@@ -39,17 +39,26 @@ public with sharing class AgentAskAboutCandidates {
     for (Request request : requests) {
       Result result = new Result();
       try {
+        List<Id> candidateIds = AgentInputs.toIds(
+          request.candidateIds,
+          Candidate__c.SObjectType,
+          'candidate'
+        );
+        Id jobId = AgentInputs.toOptionalId(
+          request.jobId,
+          Job__c.SObjectType,
+          'job'
+        );
         CandidateQuestionService.Answer answer = CandidateQuestionService.ask(
           request.question,
-          AgentInputs.toIds(
-            request.candidateIds,
-            Candidate__c.SObjectType,
-            'candidate'
-          ),
-          AgentInputs.toOptionalId(request.jobId, Job__c.SObjectType, 'job')
+          candidateIds,
+          jobId
         );
-        result.answer =
-          answer.answer + (answer.note == null ? '' : '\n\n' + answer.note);
+        String note = '';
+        if (answer.note != null) {
+          note = '\n\n' + answer.note;
+        }
+        result.answer = answer.answer + note;
       } catch (CandidateQuestionService.QuestionException ex) {
         result.answer = ex.getMessage();
       } catch (Exception ex) {

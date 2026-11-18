@@ -17,6 +17,7 @@ private class CandidateRecommendationServiceTest {
     sara.CV_Text__c = 'Sara CV';
     Candidate__c tom = TestDataFactory.newCandidate('Tom');
     tom.Years_Experience__c = 3;
+    tom.CV_Text__c = 'Tom CV';
     insert new List<Candidate__c>{ sara, tom };
     TestDataFactory.addCandidateSkills(
       sara.Id,
@@ -120,6 +121,34 @@ private class CandidateRecommendationServiceTest {
       tom.Reasoning__c
     );
     Assert.isTrue(tom.Reasoning__c.contains('Concerns: no LWC'));
+  }
+
+  @IsTest
+  static void anApplicantWithoutACardIsRankedButNotScored() {
+    Candidate__c tom = [SELECT Id FROM Candidate__c WHERE Name = 'Tom'];
+    tom.CV_Text__c = null;
+    update tom;
+    Id tomApplicant = applicant('Tom').Id;
+    AiPromptFake.install()
+      .answer(
+        Constants.TEMPLATE_RECOMMEND,
+        '{"recommendation": "Sara", "applicants": [{"applicantId": "' +
+          tomApplicant +
+          '", "reasoning": "No CV yet"}]}'
+      );
+
+    CandidateRecommendationService.Recommendation result = CandidateRecommendationService.recommend(
+      jobId(),
+      null
+    );
+
+    Assert.areEqual(2, result.ranking.size(), 'still ranked');
+    Assert.isNull(
+      applicant('Tom').Score__c,
+      'a score of an empty card would be locked'
+    );
+    Assert.isNull(applicant('Tom').Reasoning__c);
+    Assert.areEqual(100, applicant('Sara').Score__c);
   }
 
   @IsTest

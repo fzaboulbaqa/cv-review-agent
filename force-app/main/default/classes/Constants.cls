@@ -64,7 +64,10 @@ public with sharing class Constants {
     if (score >= MATCH_STRONG_SCORE) {
       return MATCH_STRONG;
     }
-    return score >= MATCH_PARTIAL_SCORE ? MATCH_PARTIAL : MATCH_WEAK;
+    if (score >= MATCH_PARTIAL_SCORE) {
+      return MATCH_PARTIAL;
+    }
+    return MATCH_WEAK;
   }
 
   public static Boolean isValidEmail(String email) {

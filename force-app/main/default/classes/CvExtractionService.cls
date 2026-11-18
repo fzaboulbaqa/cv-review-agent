@@ -133,8 +133,14 @@ public with sharing class CvExtractionService {
     FillResult result = new FillResult();
     List<Id> now = new List<Id>();
     List<Id> later = new List<Id>();
-    for (Id candidateId : new List<Id>(new Set<Id>(candidateIds))) {
-      (now.size() < MAX_CANDIDATES_PER_REQUEST ? now : later).add(candidateId);
+    // A Set removes the duplicates.
+    List<Id> uniqueIds = new List<Id>(new Set<Id>(candidateIds));
+    for (Id candidateId : uniqueIds) {
+      if (now.size() < MAX_CANDIDATES_PER_REQUEST) {
+        now.add(candidateId);
+      } else {
+        later.add(candidateId);
+      }
     }
     result.outcomes = fill(now);
     for (Candidate__c candidate : [
@@ -182,28 +188,10 @@ public with sharing class CvExtractionService {
     if (candidateIds.isEmpty()) {
       return outcomes;
     }
-    Map<Id, Candidate__c> candidates = new Map<Id, Candidate__c>(
-      [
-        SELECT
-          Id,
-          Name,
-          Email__c,
-          Phone__c,
-          Country__c,
-          Current_Title__c,
-          Summary__c,
-          Years_Experience__c,
-          Experience__c,
-          Education__c,
-          Achievements__c,
-          Photo_Version_Id__c
-        FROM Candidate__c
-        WHERE Id IN :candidateIds
-        WITH USER_MODE
-      ]
-    );
+    Map<Id, Candidate__c> candidates = queryCandidates(candidateIds);
     Map<Id, ContentVersion> cvByCandidate = latestCvs(candidates.values());
 
+    // One Work per candidate that has a CV. The others get their message now.
     List<Work> works = new List<Work>();
     for (Id candidateId : candidateIds) {
       Candidate__c candidate = candidates.get(candidateId);
@@ -233,21 +221,46 @@ public with sharing class CvExtractionService {
     }
 
     // 1. AI calls only (no DML before a callout).
+    readCards(works);
+    // 2. Save each candidate on its own.
+    Set<Id> savedCandidateIds = saveCards(works);
+    // 3. Score the applications of the candidates whose card changed.
+    addScoringNotes(works, score(savedCandidateIds));
+    Logger.saveLog();
+    return outcomes;
+  }
+
+  private static Map<Id, Candidate__c> queryCandidates(List<Id> candidateIds) {
+    return new Map<Id, Candidate__c>(
+      [
+        SELECT
+          Id,
+          Name,
+          Email__c,
+          Phone__c,
+          Country__c,
+          Current_Title__c,
+          Summary__c,
+          Years_Experience__c,
+          Experience__c,
+          Education__c,
+          Achievements__c,
+          Photo_Version_Id__c
+        FROM Candidate__c
+        WHERE Id IN :candidateIds
+        WITH USER_MODE
+      ]
+    );
+  }
+
+  /** Reads the CV text and asks the AI for the card. No DML here (callouts only). */
+  private static void readCards(List<Work> works) {
     String knownSkills = knownSkills();
     for (Work work : works) {
       try {
         work.cv = CvTextReader.read(work.version);
         if (work.cv.text != null) {
-          work.card = AiPrompt.parseJsonObject(
-            AiPrompt.run(
-              Constants.TEMPLATE_EXTRACT_CARD,
-              new Map<String, Object>{
-                'CvText' => work.cv.text,
-                'KnownSkills' => knownSkills,
-                'Today' => String.valueOf(Date.today())
-              }
-            )
-          );
+          work.card = extractCard(work.cv.text, knownSkills);
         }
       } catch (Exception ex) {
         work.cv = null;
@@ -261,8 +274,24 @@ public with sharing class CvExtractionService {
           .addTag(Constants.LOG_TAG_CV_EXTRACTION);
       }
     }
+  }
 
-    // 2. Save each candidate on its own.
+  /** Asks the AI for the card of this CV text, as a JSON object. */
+  private static Map<String, Object> extractCard(
+    String cvText,
+    String knownSkills
+  ) {
+    Map<String, Object> inputs = new Map<String, Object>{
+      'CvText' => cvText,
+      'KnownSkills' => knownSkills,
+      'Today' => String.valueOf(Date.today())
+    };
+    String answer = AiPrompt.run(Constants.TEMPLATE_EXTRACT_CARD, inputs);
+    return AiPrompt.parseJsonObject(answer);
+  }
+
+  /** Saves each candidate in its own savepoint. Returns the Ids of the saved candidates. */
+  private static Set<Id> saveCards(List<Work> works) {
     Set<Id> savedCandidateIds = new Set<Id>();
     for (Work work : works) {
       if (work.cv == null) {
@@ -287,18 +316,22 @@ public with sharing class CvExtractionService {
           .addTag(Constants.LOG_TAG_CV_EXTRACTION);
       }
     }
+    return savedCandidateIds;
+  }
 
-    // 3. Score the applications of the candidates whose card changed.
-    Map<Id, String> scoringNotes = score(savedCandidateIds);
+  /** Adds the scoring note to the message of each saved candidate, and logs the message. */
+  private static void addScoringNotes(
+    List<Work> works,
+    Map<Id, String> scoringNotes
+  ) {
     for (Work work : works) {
-      if (work.outcome.success && scoringNotes.containsKey(work.candidate.Id)) {
-        work.outcome.message += ' ' + scoringNotes.get(work.candidate.Id);
+      Id candidateId = work.candidate.Id;
+      if (work.outcome.success && scoringNotes.containsKey(candidateId)) {
+        work.outcome.message += ' ' + scoringNotes.get(candidateId);
       }
       Logger.info('Candidate card: ' + work.outcome.message)
         .addTag(Constants.LOG_TAG_CV_EXTRACTION);
     }
-    Logger.saveLog();
-    return outcomes;
   }
 
   private static void save(Work work) {
@@ -341,31 +374,41 @@ public with sharing class CvExtractionService {
     replaceFlags(candidate.Id, flags, true);
 
     work.outcome.success = true;
+    countFlags(flags, work.outcome);
+    work.outcome.message = summary(candidate.Name, work.outcome, skillCount);
+  }
+
+  private static void countFlags(
+    List<Extraction_Flag__c> flags,
+    Outcome outcome
+  ) {
     for (Extraction_Flag__c item : flags) {
       if (item.Type__c == Constants.FLAG_MISSING) {
-        work.outcome.missingCount++;
+        outcome.missingCount++;
       } else if (item.Type__c == Constants.FLAG_INFERRED) {
-        work.outcome.inferredCount++;
+        outcome.inferredCount++;
       } else {
-        work.outcome.conflictCount++;
+        outcome.conflictCount++;
       }
     }
-    work.outcome.message =
-      'Card of ' +
-      candidate.Name +
-      ': ' +
-      work.outcome.filledCount +
-      ' field(s) filled, ' +
-      work.outcome.skillsAdded +
-      ' skill(s) added (' +
-      skillCount +
-      ' in total); ' +
-      work.outcome.missingCount +
-      ' missing, ' +
-      work.outcome.inferredCount +
-      ' inferred, ' +
-      work.outcome.conflictCount +
-      ' conflicting.';
+  }
+
+  /**
+   * One line for the recruiter, e.g. "Card of Jane: 3 field(s) filled, 2 skill(s) added
+   * (5 in total); 1 missing, 0 inferred, 0 conflicting."
+   */
+  private static String summary(
+    String candidateName,
+    Outcome outcome,
+    Integer skillCount
+  ) {
+    String fields = outcome.filledCount + ' field(s) filled, ';
+    String skills = outcome.skillsAdded + ' skill(s) added (';
+    skills += skillCount + ' in total); ';
+    String counts = outcome.missingCount + ' missing, ';
+    counts += outcome.inferredCount + ' inferred, ';
+    counts += outcome.conflictCount + ' conflicting.';
+    return 'Card of ' + candidateName + ': ' + fields + skills + counts;
   }
 
   /**
@@ -390,7 +433,8 @@ public with sharing class CvExtractionService {
       }
       String recordValue = (String) candidate.get(field);
       if (String.isBlank(recordValue)) {
-        updates.put(field, cvValue.left(field.getDescribe().getLength()));
+        Integer maxLength = field.getDescribe().getLength();
+        updates.put(field, cvValue.left(maxLength));
         filled++;
       } else if (
         COMPARED_FIELDS.contains(key) &&
@@ -439,9 +483,10 @@ public with sharing class CvExtractionService {
   private static String comparable(String key, String value) {
     String result = value.trim().toLowerCase();
     // Phone numbers: compare digits only ("+212 600-000" = "212600000").
-    return key == 'phone'
-      ? result.replaceAll('[^0-9]', '')
-      : result.replaceAll('\\s+', ' ');
+    if (key == 'phone') {
+      return result.replaceAll('[^0-9]', '');
+    }
+    return result.replaceAll('\\s+', ' ');
   }
 
   /** Flags the AI found inside the CV. Unknown types are dropped, not guessed. */
@@ -459,15 +504,17 @@ public with sharing class CvExtractionService {
         continue;
       }
       String field = AiPrompt.text(item, 'field');
-      flags.add(
-        flag(
-          type,
-          FIELD_LABELS.containsKey(field) ? FIELD_LABELS.get(field) : field,
-          detail
-        )
-      );
+      flags.add(flag(type, fieldLabel(field), detail));
     }
     return flags;
+  }
+
+  /** The label of a card field, or the value itself when it is not a known field. */
+  private static String fieldLabel(String field) {
+    if (FIELD_LABELS.containsKey(field)) {
+      return FIELD_LABELS.get(field);
+    }
+    return field;
   }
 
   /**
@@ -488,13 +535,8 @@ public with sharing class CvExtractionService {
     }
     List<Extraction_Flag__c> flags = new List<Extraction_Flag__c>();
     for (String key : EXPECTED_FIELDS) {
-      Boolean empty = key == 'yearsExperience'
-        ? candidate.Years_Experience__c == null &&
-          validYears(AiPrompt.num(card, key)) == null
-        : String.isBlank((String) candidate.get(TEXT_FIELDS.get(key))) &&
-          AiPrompt.text(card, key) == null;
       String label = FIELD_LABELS.get(key);
-      if (empty && !flagged.contains(label)) {
+      if (isMissing(candidate, card, key) && !flagged.contains(label)) {
         flags.add(flag(Constants.FLAG_MISSING, label, 'Not found in CV.'));
       }
     }
@@ -504,6 +546,21 @@ public with sharing class CvExtractionService {
       );
     }
     return flags;
+  }
+
+  /** True when the field is empty on the record and not in the CV either. */
+  private static Boolean isMissing(
+    Candidate__c candidate,
+    Map<String, Object> card,
+    String key
+  ) {
+    if (key == 'yearsExperience') {
+      Decimal cvYears = validYears(AiPrompt.num(card, key));
+      return candidate.Years_Experience__c == null && cvYears == null;
+    }
+    String recordValue = (String) candidate.get(TEXT_FIELDS.get(key));
+    String cvValue = AiPrompt.text(card, key);
+    return String.isBlank(recordValue) && cvValue == null;
   }
 
   /**
@@ -517,50 +574,8 @@ public with sharing class CvExtractionService {
     List<Extraction_Flag__c> flags,
     Outcome outcome
   ) {
-    Map<String, String> nameByKey = new Map<String, String>();
-    for (Map<String, Object> skill : skills) {
-      String name = limitTo(AiPrompt.text(skill, 'name'), 80);
-      if (name == null || nameByKey.size() == MAX_SKILLS) {
-        continue;
-      }
-      String key = name.toLowerCase();
-      if (!nameByKey.containsKey(key)) {
-        nameByKey.put(key, name);
-        if (AiPrompt.bool(skill, 'inferred')) {
-          String evidence = AiPrompt.text(skill, 'evidence');
-          flags.add(
-            flag(
-              Constants.FLAG_INFERRED,
-              'Skills',
-              name +
-                ' is not written in the CV, it was deduced' +
-                (evidence == null ? '.' : ' from: "' + evidence + '"')
-            )
-          );
-        }
-      }
-    }
-
-    Map<String, Id> skillIdByKey = new Map<String, Id>();
-    List<String> names = nameByKey.values();
-    for (Skill__c skill : [
-      SELECT Id, Name
-      FROM Skill__c
-      WHERE Name IN :names
-      WITH USER_MODE
-    ]) {
-      skillIdByKey.put(skill.Name.toLowerCase(), skill.Id);
-    }
-    List<Skill__c> newSkills = new List<Skill__c>();
-    for (String key : nameByKey.keySet()) {
-      if (!skillIdByKey.containsKey(key)) {
-        newSkills.add(new Skill__c(Name = nameByKey.get(key)));
-      }
-    }
-    insert as user newSkills;
-    for (Skill__c skill : newSkills) {
-      skillIdByKey.put(skill.Name.toLowerCase(), skill.Id);
-    }
+    Map<String, String> nameByKey = cvSkillNames(skills, flags);
+    Map<String, Id> skillIdByKey = findOrCreateSkills(nameByKey);
 
     Set<Id> current = new Set<Id>();
     for (Candidate_Skill__c link : [
@@ -584,25 +599,91 @@ public with sharing class CvExtractionService {
     return current.size() + links.size();
   }
 
+  /**
+   * The skill names of the CV by lower-case name (duplicates removed, at most MAX_SKILLS).
+   * Adds an Inferred flag for each skill the AI deduced.
+   */
+  private static Map<String, String> cvSkillNames(
+    List<Map<String, Object>> skills,
+    List<Extraction_Flag__c> flags
+  ) {
+    Map<String, String> nameByKey = new Map<String, String>();
+    for (Map<String, Object> skill : skills) {
+      String name = limitTo(AiPrompt.text(skill, 'name'), 80);
+      if (name == null || nameByKey.size() == MAX_SKILLS) {
+        continue;
+      }
+      String key = name.toLowerCase();
+      if (nameByKey.containsKey(key)) {
+        continue;
+      }
+      nameByKey.put(key, name);
+      if (AiPrompt.bool(skill, 'inferred')) {
+        String evidence = AiPrompt.text(skill, 'evidence');
+        String detail = inferredDetail(name, evidence);
+        flags.add(flag(Constants.FLAG_INFERRED, 'Skills', detail));
+      }
+    }
+    return nameByKey;
+  }
+
+  private static String inferredDetail(String name, String evidence) {
+    String detail = name + ' is not written in the CV, it was deduced';
+    if (evidence == null) {
+      return detail + '.';
+    }
+    return detail + ' from: "' + evidence + '"';
+  }
+
+  /** Skill__c Id by lower-case name. Names not found create a new Skill__c. */
+  private static Map<String, Id> findOrCreateSkills(
+    Map<String, String> nameByKey
+  ) {
+    Map<String, Id> skillIdByKey = new Map<String, Id>();
+    List<String> names = nameByKey.values();
+    for (Skill__c skill : [
+      SELECT Id, Name
+      FROM Skill__c
+      WHERE Name IN :names
+      WITH USER_MODE
+    ]) {
+      skillIdByKey.put(skill.Name.toLowerCase(), skill.Id);
+    }
+    List<Skill__c> newSkills = new List<Skill__c>();
+    for (String key : nameByKey.keySet()) {
+      if (!skillIdByKey.containsKey(key)) {
+        newSkills.add(new Skill__c(Name = nameByKey.get(key)));
+      }
+    }
+    insert as user newSkills;
+    for (Skill__c skill : newSkills) {
+      skillIdByKey.put(skill.Name.toLowerCase(), skill.Id);
+    }
+    return skillIdByKey;
+  }
+
   /** all = true: the CV was read again, every old flag goes. false: only the old CV flag goes. */
   private static void replaceFlags(
     Id candidateId,
     List<Extraction_Flag__c> flags,
     Boolean all
   ) {
-    List<Extraction_Flag__c> old = all
-      ? [
-          SELECT Id
-          FROM Extraction_Flag__c
-          WHERE Candidate__c = :candidateId
-          WITH USER_MODE
-        ]
-      : [
-          SELECT Id
-          FROM Extraction_Flag__c
-          WHERE Candidate__c = :candidateId AND Field__c = 'CV'
-          WITH USER_MODE
-        ];
+    List<Extraction_Flag__c> old;
+    if (all) {
+      old = [
+        SELECT Id
+        FROM Extraction_Flag__c
+        WHERE Candidate__c = :candidateId
+        WITH USER_MODE
+      ];
+    } else {
+      old = [
+        SELECT Id
+        FROM Extraction_Flag__c
+        WHERE Candidate__c = :candidateId AND Field__c = 'CV'
+        WITH USER_MODE
+      ];
+    }
     delete as user old;
     for (Extraction_Flag__c item : flags) {
       item.Candidate__c = candidateId;
@@ -619,23 +700,21 @@ public with sharing class CvExtractionService {
     if (candidateIds.isEmpty()) {
       return notes;
     }
-    Set<Id> jobIds = new Set<Id>();
     Set<Id> scoredCandidates = new Set<Id>();
     for (Job_Applicant__c applicant : [
-      SELECT Job__c, Candidate__c
+      SELECT Candidate__c
       FROM Job_Applicant__c
       WHERE Candidate__c IN :candidateIds AND Score__c = NULL
       WITH USER_MODE
     ]) {
-      jobIds.add(applicant.Job__c);
       scoredCandidates.add(applicant.Candidate__c);
     }
-    if (jobIds.isEmpty()) {
+    if (scoredCandidates.isEmpty()) {
       return notes;
     }
     String note;
     try {
-      ScoringService.scoreApplicants(jobIds);
+      ScoringService.scoreCandidates(scoredCandidates);
       note = 'Application(s) scored.';
     } catch (Exception ex) {
       note = 'Not scored: ' + ex.getMessage();
@@ -661,6 +740,47 @@ public with sharing class CvExtractionService {
     if (candidates.isEmpty()) {
       return result;
     }
+    Map<Id, Id> candidateByDocument = candidatesByDocument(candidates);
+    Set<Id> documentIds = candidateByDocument.keySet();
+    Map<Id, ContentVersion> otherReadable = new Map<Id, ContentVersion>();
+    Map<Id, ContentVersion> unreadable = new Map<Id, ContentVersion>();
+    // Newest first: the first file seen per candidate and kind wins.
+    for (ContentVersion version : [
+      SELECT Id, ContentDocumentId, FileExtension, Title
+      FROM ContentVersion
+      WHERE ContentDocumentId IN :documentIds AND IsLatest = TRUE
+      WITH USER_MODE
+      ORDER BY CreatedDate DESC
+    ]) {
+      Id candidateId = candidateByDocument.get(version.ContentDocumentId);
+      String extension = version.FileExtension?.toLowerCase();
+      Map<Id, ContentVersion> target;
+      if (CvTextReader.READABLE_EXTENSIONS.contains(extension)) {
+        if (version.Title.toLowerCase().startsWith('cv')) {
+          target = result;
+        } else {
+          target = otherReadable;
+        }
+      } else if (!Constants.IMAGE_EXTENSIONS.contains(extension)) {
+        target = unreadable;
+      }
+      if (target != null && !target.containsKey(candidateId)) {
+        target.put(candidateId, version);
+      }
+    }
+    // Candidates without a "CV..." file: another readable file, else an unreadable one.
+    addWhenMissing(result, otherReadable);
+    addWhenMissing(result, unreadable);
+    return result;
+  }
+
+  /**
+   * The candidate of each file linked to these candidates, by ContentDocument Id.
+   * The profile photos are left out.
+   */
+  private static Map<Id, Id> candidatesByDocument(
+    List<Candidate__c> candidates
+  ) {
     Set<Id> photoVersionIds = new Set<Id>();
     Set<Id> candidateIds = new Set<Id>();
     for (Candidate__c candidate : candidates) {
@@ -679,7 +799,7 @@ public with sharing class CvExtractionService {
       photoDocumentIds.add(photo.ContentDocumentId);
     }
 
-    Map<Id, Id> candidateByDocument = new Map<Id, Id>();
+    Map<Id, Id> result = new Map<Id, Id>();
     for (ContentDocumentLink link : [
       SELECT ContentDocumentId, LinkedEntityId
       FROM ContentDocumentLink
@@ -687,47 +807,22 @@ public with sharing class CvExtractionService {
       WITH USER_MODE
     ]) {
       if (!photoDocumentIds.contains(link.ContentDocumentId)) {
-        candidateByDocument.put(link.ContentDocumentId, link.LinkedEntityId);
-      }
-    }
-    Set<Id> documentIds = candidateByDocument.keySet();
-    Map<Id, ContentVersion> otherReadable = new Map<Id, ContentVersion>();
-    Map<Id, ContentVersion> unreadable = new Map<Id, ContentVersion>();
-    // Newest first: the first file seen per candidate and kind wins.
-    for (ContentVersion version : [
-      SELECT Id, ContentDocumentId, FileExtension, Title
-      FROM ContentVersion
-      WHERE ContentDocumentId IN :documentIds AND IsLatest = TRUE
-      WITH USER_MODE
-      ORDER BY CreatedDate DESC
-    ]) {
-      Id candidateId = candidateByDocument.get(version.ContentDocumentId);
-      String extension = version.FileExtension?.toLowerCase();
-      Map<Id, ContentVersion> target;
-      if (CvTextReader.READABLE_EXTENSIONS.contains(extension)) {
-        target = version.Title.toLowerCase().startsWith('cv')
-          ? result
-          : otherReadable;
-      } else if (!Constants.IMAGE_EXTENSIONS.contains(extension)) {
-        target = unreadable;
-      }
-      if (target != null && !target.containsKey(candidateId)) {
-        target.put(candidateId, version);
-      }
-    }
-    for (
-      Map<Id, ContentVersion> fallback : new List<Map<Id, ContentVersion>>{
-        otherReadable,
-        unreadable
-      }
-    ) {
-      for (Id candidateId : fallback.keySet()) {
-        if (!result.containsKey(candidateId)) {
-          result.put(candidateId, fallback.get(candidateId));
-        }
+        result.put(link.ContentDocumentId, link.LinkedEntityId);
       }
     }
     return result;
+  }
+
+  /** Copies into target the files of the candidates target doesn't have yet. */
+  private static void addWhenMissing(
+    Map<Id, ContentVersion> target,
+    Map<Id, ContentVersion> source
+  ) {
+    for (Id candidateId : source.keySet()) {
+      if (!target.containsKey(candidateId)) {
+        target.put(candidateId, source.get(candidateId));
+      }
+    }
   }
 
   /** Existing skill names, so the AI reuses them ("JS" vs "JavaScript") and scoring can match. */
@@ -742,7 +837,10 @@ public with sharing class CvExtractionService {
     ]) {
       names.add(skill.Name);
     }
-    return names.isEmpty() ? '(none yet)' : String.join(names, ', ');
+    if (names.isEmpty()) {
+      return '(none yet)';
+    }
+    return String.join(names, ', ');
   }
 
   private static Extraction_Flag__c flag(
@@ -759,7 +857,10 @@ public with sharing class CvExtractionService {
 
   /** Years outside 0..60 are not believable: dropped (and then reported as Missing). */
   private static Decimal validYears(Decimal years) {
-    return years == null || years < 0 || years > 60 ? null : years.setScale(1);
+    if (years == null || years < 0 || years > 60) {
+      return null;
+    }
+    return years.setScale(1);
   }
 
   private static String normalizeEmail(String email) {
@@ -767,10 +868,16 @@ public with sharing class CvExtractionService {
       return null;
     }
     String result = email.trim().toLowerCase();
-    return Constants.isValidEmail(result) ? result : null;
+    if (!Constants.isValidEmail(result)) {
+      return null;
+    }
+    return result;
   }
 
   private static String limitTo(String value, Integer maxLength) {
-    return value == null ? null : value.left(maxLength);
+    if (value == null) {
+      return null;
+    }
+    return value.left(maxLength);
   }
 }

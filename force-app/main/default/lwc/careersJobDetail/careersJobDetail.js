@@ -21,7 +21,10 @@ export default class CareersJobDetail extends NavigationMixin(
 
   @wire(CurrentPageReference)
   handlePageReference(pageReference) {
-    const jobId = pageReference?.state?.jobId;
+    let jobId;
+    if (pageReference && pageReference.state) {
+      jobId = pageReference.state.jobId;
+    }
     if (jobId && jobId !== this.jobId) {
       this.jobId = jobId;
       this.isApplying = false;
@@ -45,18 +48,19 @@ export default class CareersJobDetail extends NavigationMixin(
   }
 
   get job() {
-    const { job } = this.detail;
+    const job = this.detail.job;
+    const hasMinimum =
+      job.minYears !== null && job.minYears !== undefined && job.minYears !== 0;
+    let experienceLabel = "No minimum experience";
+    if (hasMinimum) {
+      experienceLabel = `At least ${job.minYears} years of experience`;
+    }
     return {
       ...job,
       tag: experienceTag(job.minYears),
       location: job.location || "Location not specified",
       dueLabel: dueDateLabel(job.dueDate),
-      experienceLabel:
-        job.minYears === null ||
-        job.minYears === undefined ||
-        job.minYears === 0
-          ? "No minimum experience"
-          : `At least ${job.minYears} years of experience`
+      experienceLabel
     };
   }
 
@@ -80,9 +84,10 @@ export default class CareersJobDetail extends NavigationMixin(
     this.isApplying = true;
     // Wait for the form to render, then bring it into view.
     Promise.resolve().then(() => {
-      this.template
-        .querySelector("c-careers-apply-form")
-        ?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+      const form = this.template.querySelector("c-careers-apply-form");
+      if (form && form.scrollIntoView) {
+        form.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
     });
   }
 

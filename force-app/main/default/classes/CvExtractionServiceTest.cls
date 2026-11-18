@@ -119,6 +119,12 @@ private class CvExtractionServiceTest {
       candidate.Id,
       null
     );
+    // Another applicant of the same job, card not filled yet.
+    Job_Applicant__c other = TestDataFactory.createApplicant(
+      job().Id,
+      TestDataFactory.createCandidate('Not Read Yet').Id,
+      null
+    );
 
     Test.startTest();
     CvExtractionService.FillResult result = CvExtractionService.fillCards(
@@ -126,6 +132,10 @@ private class CvExtractionServiceTest {
     );
     Test.stopTest();
 
+    Assert.isNull(
+      [SELECT Score__c FROM Job_Applicant__c WHERE Id = :other.Id].Score__c,
+      'only the filled candidate is scored: a score is locked once set'
+    );
     Assert.areEqual(1, result.outcomes.size());
     Assert.isTrue(result.notDone.isEmpty());
     CvExtractionService.Outcome outcome = result.outcomes[0];

@@ -81,7 +81,10 @@ export default class CandidateCard extends NavigationMixin(LightningElement) {
   }
 
   get recordPageId() {
-    return this.isRecordPage ? this.recordId : undefined;
+    if (this.isRecordPage) {
+      return this.recordId;
+    }
+    return undefined;
   }
 
   async loadCard() {
@@ -103,72 +106,115 @@ export default class CandidateCard extends NavigationMixin(LightningElement) {
       return undefined;
     }
     const level = scoreLevel(data.score);
+    const skills = data.skills || [];
+
+    // Years of experience
     const hasYears =
       data.yearsExperience !== null && data.yearsExperience !== undefined;
-    const skills = data.skills || [];
+    let years = `Years of experience: ${NOT_FOUND_TEXT}`;
+    let yearsClass = "years missing";
+    if (hasYears) {
+      years = `${data.yearsExperience} years of experience`;
+      yearsClass = "years";
+    }
+
+    // Score
+    let scoreLabel = data.score;
+    if (data.score === null || data.score === undefined) {
+      scoreLabel = "-";
+    }
+
+    // Skills: the tile shows the first few, the record page shows more with "Show more"
     const extraSkills = skills.slice(MAX_SKILLS_SHOWN);
-    const flagDetails = data.flags || [];
-    const present = FLAG_TYPES.filter((flag) => data[flag.countField] > 0);
-    const flagTotal = present.reduce(
-      (total, flag) => total + data[flag.countField],
-      0
-    );
+    let extraSkillsLabel = null;
+    if (extraSkills.length > 0) {
+      extraSkillsLabel = `+${extraSkills.length}`;
+    }
+    let pageSkills = skills.slice(0, PAGE_SKILLS_SHOWN);
+    let moreSkillsLabel = `Show more (${skills.length - PAGE_SKILLS_SHOWN})`;
+    if (this.showAllSkills) {
+      pageSkills = skills;
+      moreSkillsLabel = "Show less";
+    }
+
+    // Flags: only the types this candidate has
+    const presentFlags = FLAG_TYPES.filter((flag) => data[flag.countField] > 0);
+    let flagTotal = 0;
+    for (const flag of presentFlags) {
+      flagTotal += data[flag.countField];
+    }
 
     return {
       ...data,
       initials: initials(data.name),
       photoAlt: `Photo of ${data.name}`,
       subtitle: subtitle(data.currentTitle, data.country),
-      years: hasYears
-        ? `${data.yearsExperience} years of experience`
-        : `Years of experience: ${NOT_FOUND_TEXT}`,
-      yearsClass: hasYears ? "years" : "years missing",
+      years,
+      yearsClass,
       // A score belongs to an application, so it only shows in a job's applicant list.
       hasApplication: Boolean(data.applicantId),
-      scoreLabel:
-        data.score === null || data.score === undefined ? "-" : data.score,
+      scoreLabel,
       scoreClass: `score score_${level.key}`,
       levelLabel: level.label,
       skills,
       shownSkills: skills.slice(0, MAX_SKILLS_SHOWN),
-      extraSkillsLabel: extraSkills.length ? `+${extraSkills.length}` : null,
+      extraSkillsLabel,
       extraSkillsTitle: extraSkills.join(", "),
-      pageSkills: this.showAllSkills
-        ? skills
-        : skills.slice(0, PAGE_SKILLS_SHOWN),
+      pageSkills,
       hasMoreSkills: skills.length > PAGE_SKILLS_SHOWN,
-      moreSkillsLabel: this.showAllSkills
-        ? "Show less"
-        : `Show more (${skills.length - PAGE_SKILLS_SHOWN})`,
+      moreSkillsLabel,
       hasSkills: skills.length > 0,
       skillsSectionLabel: `Skills (${skills.length})`,
-      flagCounts: present.map((flag) => ({
-        type: flag.type,
-        pillClass: `pill pill_${flag.key}`,
-        label: `${data[flag.countField]} ${flag.type}`
-      })),
-      flagGroups: present
-        .map((flag) => ({
-          type: flag.type,
-          hint: flag.hint,
-          pillClass: `pill pill_${flag.key}`,
-          groupClass: `flag-group flag-group_${flag.key}`,
-          items: flagDetails
-            .filter((item) => item.type === flag.type)
-            .map((item, index) => ({
-              key: item.flagId || `${flag.type}-${index}`,
-              field: item.field || "General",
-              detail: item.detail
-            }))
-        }))
-        .filter((group) => group.items.length > 0),
+      flagCounts: this.buildFlagCounts(data, presentFlags),
+      flagGroups: this.buildFlagGroups(data.flags || [], presentFlags),
       hasFlags: flagTotal > 0,
       qualitySectionLabel: `Data quality (${flagTotal})`
     };
   }
 
+  /** One pill per flag type, e.g. "2 Missing". */
+  buildFlagCounts(data, presentFlags) {
+    return presentFlags.map((flag) => {
+      return {
+        type: flag.type,
+        pillClass: `pill pill_${flag.key}`,
+        label: `${data[flag.countField]} ${flag.type}`
+      };
+    });
+  }
+
+  /** The flag details grouped by type. Types without any detail are left out. */
+  buildFlagGroups(flagDetails, presentFlags) {
+    const groups = [];
+    for (const flag of presentFlags) {
+      const flagsOfType = flagDetails.filter((item) => item.type === flag.type);
+      if (flagsOfType.length === 0) {
+        continue;
+      }
+      const items = flagsOfType.map((item, index) => {
+        return {
+          key: item.flagId || `${flag.type}-${index}`,
+          field: item.field || "General",
+          detail: item.detail
+        };
+      });
+      groups.push({
+        type: flag.type,
+        hint: flag.hint,
+        pillClass: `pill pill_${flag.key}`,
+        groupClass: `flag-group flag-group_${flag.key}`,
+        items
+      });
+    }
+    return groups;
+  }
+
   get photoButtonLabel() {
-    return this.view?.photoUrl ? "Change photo" : "Add photo";
+    const view = this.view;
+    if (view && view.photoUrl) {
+      return "Change photo";
+    }
+    return "Add photo";
   }
 
   toggleAllSkills() {
@@ -180,7 +226,7 @@ export default class CandidateCard extends NavigationMixin(LightningElement) {
   }
 
   async handlePhotoUploaded(event) {
-    const [file] = event.detail.files;
+    const file = event.detail.files[0];
     this.isPhotoUploadOpen = false;
     try {
       const result = await setPhoto({

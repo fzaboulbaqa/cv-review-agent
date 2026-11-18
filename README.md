@@ -28,16 +28,17 @@ Every AI answer, recommendation and bookmark is logged for audit.
 
 ## What's in the box
 
-| Area                              | Components                                                                                                                             |
-| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Careers portal (Experience Cloud) | `careersJobList`, `careersJobDetail`, `careersApplyForm` LWCs, `CareersController`, `CareersApplicationService`                        |
-| Recruiter app (Lightning)         | `Clouding HR` app, `candidateCard` and `jobApplicants` LWCs, record pages, `Clouding_HR` permission set                                |
-| Agent                             | `CV_Review_Agent` (Agent Script in `aiAuthoringBundles/`), 6 actions (`genAiFunctions/` + `Agent*` Apex classes), 6 conversation tests |
-| AI                                | 4 Prompt Builder templates: `CV_Read_Text`, `CV_Extract_Card`, `CV_Answer_Question`, `CV_Recommend`                                    |
-| Services                          | `CvTextReader`, `CvExtractionService`, `CandidateQuestionService`, `CandidateRecommendationService`, `ScoringService`, `AiPrompt`      |
-| Automation                        | `Create_Bookmark` (autolaunched flow), `Bookmark` (screen flow), validation rules `Score_Range` and `Score_Locked`                     |
-| Shared code                       | `Constants`, `TestDataFactory`                                                                                                         |
-| Logging                           | Nebula Logger (unlocked package)                                                                                                       |
+| Area                              | Components                                                                                                                               |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Careers portal (Experience Cloud) | `careersJobList`, `careersJobDetail`, `careersApplyForm` LWCs, `CareersController`, `CareersApplicationService`                          |
+| Recruiter app (Lightning)         | `Clouding HR` app, `candidateCard` and `jobApplicants` LWCs, record pages, `Clouding_HR` permission set                                  |
+| Agent                             | `CV_Review_Agent` (Agent Script in `aiAuthoringBundles/`), 6 actions (`genAiFunctions/` + `Agent*` Apex classes), 6 conversation tests   |
+| AI                                | 4 Prompt Builder templates: `CV_Read_Text`, `CV_Extract_Card`, `CV_Answer_Question`, `CV_Recommend`                                      |
+| Services                          | `CvTextReader`, `CvExtractionService`, `CandidateQuestionService`, `CandidateRecommendationService`, `ScoringService`, `AiPrompt`        |
+| Automation                        | `Create_Bookmark` (autolaunched flow), `Bookmark` (screen flow), validation rules `Score_Range` and `Score_Locked`                       |
+| Shared code                       | `Constants`, `TestDataFactory`                                                                                                           |
+| Logging                           | Nebula Logger (unlocked package)                                                                                                         |
+| Demo                              | `scripts/demo/seed-demo.mjs` (jobs, candidates, CVs, photos), `demo/cvs` and `demo/photos`, `docs/DEMO_PLAN.md`, overview PDF in `docs/` |
 
 ## Architecture
 
@@ -255,10 +256,15 @@ sf agent validate authoring-bundle --api-name CV_Review_Agent -o <org>
 sf agent publish authoring-bundle --api-name CV_Review_Agent -o <org>
 sf agent activate --api-name CV_Review_Agent -o <org>
 
-# 4. Demo data (jobs, skills, candidates, applications)
-sf apex run --file scripts/apex/seed-demo-data.apex -o <org>
+# 4. Demo data: 4 jobs, 5 candidates with their CV and photo, 13 applications
+node scripts/demo/seed-demo.mjs --org <org>          # add --fill-cards to fill the cards now
 sf apex run --file scripts/apex/seed-careers-jobs.apex -o <org>   # extra portal jobs
 ```
+
+The demo CVs are built from `scripts/demo/build_cvs.py` (`python3 scripts/demo/build_cvs.py`,
+needs weasyprint and pandoc). Four of the people are fictional. Fatima-Ezzahra's CV is real, with the
+CV Review Agent project added. The demo plan, with what to type and the expected scores, is in
+[docs/DEMO_PLAN.md](docs/DEMO_PLAN.md).
 
 Then assign recruiters the `Clouding_HR` permission set (app, objects, Apex classes and agent
 access) and the standard **Prompt Template User** permission set. The agent opens from the
@@ -266,12 +272,12 @@ Agentforce icon in the Lightning header.
 
 ## Testing
 
-| Suite               | What it covers                                                                                                                        | Command                                                                 |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| Apex                | All services, agent actions, controllers, flows, the portal. The AI is replaced by `AiPromptFake`. Data comes from `TestDataFactory`. | `sf apex run test -o <org> --test-level RunLocalTests --wait 20`        |
-| Agent conversations | 6 conversations against the live agent: card, card question, Q&A, two comparisons (strong match, no strong match), off-topic          | `sf agent test run --api-name CV_Review_Agent_Tests -o <org> --wait 15` |
+| Suite               | What it covers                                                                                                                                                             | Command                                                                 |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Apex                | All services, agent actions, controllers, flows, the portal. The AI is replaced by `AiPromptFake`. Data comes from `TestDataFactory`.                                      | `sf apex run test -o <org> --test-level RunLocalTests --wait 20`        |
+| Agent conversations | 6 conversations against the live agent on the demo data (seeded with `--fill-cards`): card, card question, Q&A, two comparisons (strong match, no strong match), off-topic | `sf agent test run --api-name CV_Review_Agent_Tests -o <org> --wait 15` |
 
-Current results: 82 Apex tests pass. The agent tests pass on actions and answers.
+Current results: 83 Apex tests pass. The agent tests pass on actions and answers.
 
 The AI prompts were also checked by hand against real CVs:
 
@@ -295,7 +301,9 @@ reliable routing check, and it passes on all 6 cases.
 - **Deterministic scoring.** Same data, same score, every point explainable. The AI explains the
   score but never sets it, so its text can't contradict the number.
 - **Scored once.** A score is locked once saved, because bookmarks show it. Re-scoring would
-  change what an existing bookmark shows.
+  change what an existing bookmark shows. So an application is only scored once its candidate's
+  card is filled from the CV: filling one card scores that candidate only, and a comparison
+  ranks applicants without a card but doesn't save their score.
 - **No automatic rejection.** The assignment asks for the best available option when no one is a
   strong match. A human decides, based on data that may be uncertain.
 - **No triggers.** Every rule considered was a validation or a duplicate check: validation rules

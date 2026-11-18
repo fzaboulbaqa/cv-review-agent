@@ -34,31 +34,16 @@ public with sharing class CvTextReader {
   /** version: needs Id, ContentDocumentId, FileExtension and Title. */
   public static CvText read(ContentVersion version) {
     CvText result = new CvText();
-    String extension = version.FileExtension == null
-      ? ''
-      : version.FileExtension.toLowerCase();
+    String extension = '';
+    if (version.FileExtension != null) {
+      extension = version.FileExtension.toLowerCase();
+    }
+    if (!READABLE_EXTENSIONS.contains(extension)) {
+      result.problem = unreadableTypeMessage(version.Title, extension);
+      return result;
+    }
     try {
-      if (extension == 'pdf') {
-        String answer = AiPrompt.run(
-          Constants.TEMPLATE_READ_CV,
-          new Map<String, Object>{
-            'CvFile' => AiPrompt.fileInput(version.ContentDocumentId)
-          }
-        );
-        result.text = answer.contains(NO_TEXT) ? null : answer;
-      } else if (extension == 'docx') {
-        result.text = docxText(versionData(version.Id));
-      } else if (extension == 'txt') {
-        result.text = versionData(version.Id).toString();
-      } else {
-        result.problem =
-          'The CV "' +
-          version.Title +
-          '" is a .' +
-          (String.isBlank(extension) ? '(unknown)' : extension) +
-          ' file, which can\'t be read. Ask the candidate for a PDF or DOCX version.';
-        return result;
-      }
+      result.text = readText(version, extension);
     } catch (AiPrompt.AiException ex) {
       throw ex;
     } catch (Exception ex) {
@@ -85,6 +70,40 @@ public with sharing class CvTextReader {
       result.truncated = true;
     }
     return result;
+  }
+
+  /** extension: one of READABLE_EXTENSIONS. */
+  private static String readText(ContentVersion version, String extension) {
+    if (extension == 'pdf') {
+      return pdfText(version.ContentDocumentId);
+    }
+    if (extension == 'docx') {
+      return docxText(versionData(version.Id));
+    }
+    return versionData(version.Id).toString();
+  }
+
+  /** The AI reads the PDF. Null when it found no CV text. */
+  private static String pdfText(Id contentDocumentId) {
+    Map<String, Object> inputs = new Map<String, Object>{
+      'CvFile' => AiPrompt.fileInput(contentDocumentId)
+    };
+    String answer = AiPrompt.run(Constants.TEMPLATE_READ_CV, inputs);
+    if (answer.contains(NO_TEXT)) {
+      return null;
+    }
+    return answer;
+  }
+
+  private static String unreadableTypeMessage(String title, String extension) {
+    String shownExtension = extension;
+    if (String.isBlank(extension)) {
+      shownExtension = '(unknown)';
+    }
+    String message = 'The CV "' + title + '" is a .' + shownExtension;
+    message += ' file, which can\'t be read.';
+    message += ' Ask the candidate for a PDF or DOCX version.';
+    return message;
   }
 
   /** Text of a .docx: paragraphs become lines, tags are removed, XML entities decoded. */

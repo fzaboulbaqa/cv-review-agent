@@ -11,6 +11,12 @@ const CV_EXTENSIONS = ["pdf", "doc", "docx"];
 const OTHER_EXTENSIONS = ["pdf", "doc", "docx", "png", "jpg", "jpeg"];
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/** ["pdf", "doc"] -> ".pdf,.doc" */
+function toAcceptList(extensions) {
+  const withDots = extensions.map((extension) => `.${extension}`);
+  return withDots.join(",");
+}
+
 /**
  * Application form for one job: contact details, CV (required), up to 3 other documents and
  * consent. Files are sent as base64 to Apex: the guest user has no record to attach them to yet.
@@ -31,25 +37,29 @@ export default class CareersApplyForm extends LightningElement {
   successMessage;
   isSubmitting = false;
 
-  cvAccept = CV_EXTENSIONS.map((ext) => `.${ext}`).join(",");
-  otherAccept = OTHER_EXTENSIONS.map((ext) => `.${ext}`).join(",");
+  // "accept" value of the file inputs, e.g. ".pdf,.doc,.docx"
+  cvAccept = toAcceptList(CV_EXTENSIONS);
+  otherAccept = toAcceptList(OTHER_EXTENSIONS);
 
   get title() {
     return `Apply for ${this.jobTitle}`;
   }
 
   get cvName() {
-    return this.cvFile
-      ? `${this.cvFile.name} (${this.formatSize(this.cvFile.size)})`
-      : "No file chosen";
+    if (!this.cvFile) {
+      return "No file chosen";
+    }
+    return this.fileLabel(this.cvFile);
   }
 
   get otherFileItems() {
-    return this.otherFiles.map((file, index) => ({
-      key: `${index}-${file.name}`,
-      index,
-      label: `${file.name} (${this.formatSize(file.size)})`
-    }));
+    return this.otherFiles.map((file, index) => {
+      return {
+        key: `${index}-${file.name}`,
+        index,
+        label: this.fileLabel(file)
+      };
+    });
   }
 
   get hasOtherFiles() {
@@ -61,21 +71,28 @@ export default class CareersApplyForm extends LightningElement {
   }
 
   get submitLabel() {
-    return this.isSubmitting ? "Sending..." : "Submit application";
+    if (this.isSubmitting) {
+      return "Sending...";
+    }
+    return "Submit application";
   }
 
   // ---------- Inputs ----------
 
+  // One handler for every field: data-field on the input names the property to set.
   handleInput(event) {
-    const field = event.target.dataset.field;
-    this[field] =
-      event.target.type === "checkbox"
-        ? event.target.checked
-        : event.target.value;
+    const input = event.target;
+    const field = input.dataset.field;
+    if (input.type === "checkbox") {
+      this[field] = input.checked;
+    } else {
+      this[field] = input.value;
+    }
   }
 
   handleCv(event) {
-    const [file] = event.target.files;
+    const file = event.target.files[0];
+    // Clear the input so choosing the same file again still fires a change.
     event.target.value = null;
     if (!file) {
       return;
@@ -139,9 +156,8 @@ export default class CareersApplyForm extends LightningElement {
     this.isSubmitting = true;
     this.error = undefined;
     try {
-      const result = await apply({
-        application: await this.buildApplication()
-      });
+      const application = await this.buildApplication();
+      const result = await apply({ application });
       if (result.success) {
         this.successMessage = result.message;
       } else {
@@ -171,10 +187,10 @@ export default class CareersApplyForm extends LightningElement {
       this.error = "Please upload your CV.";
       return false;
     }
-    const total = [this.cvFile, ...this.otherFiles].reduce(
-      (sum, file) => sum + file.size,
-      0
-    );
+    let total = this.cvFile.size;
+    for (const file of this.otherFiles) {
+      total += file.size;
+    }
     if (total > MAX_TOTAL_BYTES) {
       this.error = "All files together must be smaller than 3 MB.";
       return false;
@@ -187,11 +203,12 @@ export default class CareersApplyForm extends LightningElement {
     return true;
   }
 
+  /** The data sent to CareersController.apply, files included as base64. */
   async buildApplication() {
-    const toUpload = async (file) => ({
-      fileName: file.name,
-      base64: await readAsBase64(file)
-    });
+    const cv = await this.toUploadedFile(this.cvFile);
+    const otherFiles = await Promise.all(
+      this.otherFiles.map((file) => this.toUploadedFile(file))
+    );
     return {
       jobId: this.jobId,
       fullName: this.fullName,
@@ -199,20 +216,39 @@ export default class CareersApplyForm extends LightningElement {
       phone: this.phone,
       country: this.country,
       consent: this.consent,
-      cv: await toUpload(this.cvFile),
-      otherFiles: await Promise.all(this.otherFiles.map(toUpload))
+      cv,
+      otherFiles
     };
+  }
+
+  async toUploadedFile(file) {
+    const base64 = await readAsBase64(file);
+    return { fileName: file.name, base64 };
   }
 
   // ---------- Helpers ----------
 
+  /** Returns the error message when the file type is not allowed, otherwise null. */
   checkFile(file, extensions, message) {
-    return extensions.includes(extensionOf(file.name)) ? null : message;
+    const extension = extensionOf(file.name);
+    if (extensions.includes(extension)) {
+      return null;
+    }
+    return message;
   }
 
+  /** "cv.pdf (120 KB)" */
+  fileLabel(file) {
+    return `${file.name} (${this.formatSize(file.size)})`;
+  }
+
+  /** Under 1 MB in KB (at least 1 KB), otherwise in MB with one decimal. */
   formatSize(bytes) {
-    return bytes < MB
-      ? `${Math.max(1, Math.round(bytes / 1024))} KB`
-      : `${(bytes / MB).toFixed(1)} MB`;
+    if (bytes < MB) {
+      const kilobytes = Math.max(1, Math.round(bytes / 1024));
+      return `${kilobytes} KB`;
+    }
+    const megabytes = (bytes / MB).toFixed(1);
+    return `${megabytes} MB`;
   }
 }

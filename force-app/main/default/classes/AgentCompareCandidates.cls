@@ -44,13 +44,12 @@ public with sharing class AgentCompareCandidates {
       Result result = new Result();
       try {
         Id jobId = AgentInputs.toId(request.jobId, Job__c.SObjectType, 'job');
-        Set<Id> candidateIds = new Set<Id>(
-          AgentInputs.toIds(
-            request.candidateIds,
-            Candidate__c.SObjectType,
-            'candidate'
-          )
+        List<Id> candidateIdList = AgentInputs.toIds(
+          request.candidateIds,
+          Candidate__c.SObjectType,
+          'candidate'
         );
+        Set<Id> candidateIds = new Set<Id>(candidateIdList);
         CandidateRecommendationService.Recommendation recommendation = CandidateRecommendationService.recommend(
           jobId,
           candidateIds
@@ -70,34 +69,39 @@ public with sharing class AgentCompareCandidates {
   private static String format(
     CandidateRecommendationService.Recommendation recommendation
   ) {
-    List<String> lines = new List<String>{
-      'Job: ' + recommendation.jobName,
-      recommendation.hasStrongMatch
-        ? ''
-        : 'No applicant is a strong match (score ' +
-          Constants.MATCH_STRONG_SCORE +
-          ' or more): the best available option is shown with its gaps.',
-      recommendation.recommendation,
-      '',
-      'Ranking (scores from the scoring rules, not from the AI):'
-    };
+    // Empty when there is a strong match: it then shows as a blank line.
+    String strongMatchWarning = '';
+    if (!recommendation.hasStrongMatch) {
+      strongMatchWarning =
+        'No applicant is a strong match (score ' +
+        Constants.MATCH_STRONG_SCORE +
+        ' or more): the best available option is shown with its gaps.';
+    }
+
+    List<String> lines = new List<String>();
+    lines.add('Job: ' + recommendation.jobName);
+    lines.add(strongMatchWarning);
+    lines.add(recommendation.recommendation);
+    lines.add('');
+    lines.add('Ranking (scores from the scoring rules, not from the AI):');
     for (
       CandidateRecommendationService.Ranked ranked : recommendation.ranking
     ) {
-      lines.add(
-        ranked.rank +
-          '. ' +
-          ranked.candidateName +
-          ': ' +
-          ranked.score +
-          '/100, ' +
-          ranked.matchLevel +
-          ' (applicantId: ' +
-          ranked.applicantId +
-          ')\n   ' +
-          ranked.breakdown.replace('\n', '\n   ')
-      );
+      lines.add(rankingEntry(ranked));
     }
-    return String.join(lines, '\n').replace('\n\n\n', '\n\n');
+    String text = String.join(lines, '\n');
+    // Never more than one blank line in a row.
+    return text.replace('\n\n\n', '\n\n');
+  }
+
+  /** "1. Name: 80/100, Strong (applicantId: ...)" then the breakdown, indented. */
+  private static String rankingEntry(
+    CandidateRecommendationService.Ranked ranked
+  ) {
+    String title = ranked.rank + '. ' + ranked.candidateName;
+    title += ': ' + ranked.score + '/100, ' + ranked.matchLevel;
+    title += ' (applicantId: ' + ranked.applicantId + ')';
+    String indentedBreakdown = ranked.breakdown.replace('\n', '\n   ');
+    return title + '\n   ' + indentedBreakdown;
   }
 }

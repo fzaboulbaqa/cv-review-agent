@@ -38,9 +38,11 @@ public with sharing class AgentFindJobs {
   }
 
   private static String find(String searchText) {
-    String pattern = String.isBlank(searchText)
-      ? '%'
-      : '%' + searchText.trim() + '%';
+    // No search text: every job.
+    String pattern = '%';
+    if (String.isNotBlank(searchText)) {
+      pattern = '%' + searchText.trim() + '%';
+    }
     List<String> lines = new List<String>();
     for (Job__c job : [
       SELECT
@@ -55,23 +57,30 @@ public with sharing class AgentFindJobs {
       ORDER BY Name
       LIMIT :MAX_RESULTS
     ]) {
-      lines.add(
-        job.Name +
-          ' | ' +
-          (job.Location__c == null ? 'no location' : job.Location__c) +
-          ' | ' +
-          job.Job_Applicants__r.size() +
-          ' applicant(s)' +
-          ' | ' +
-          (job.Due_Date__c == null
-            ? 'no due date'
-            : 'due ' + job.Due_Date__c.format()) +
-          ' | jobId: ' +
-          job.Id
-      );
+      lines.add(describe(job));
     }
-    return lines.isEmpty()
-      ? 'No job found for "' + searchText + '".'
-      : String.join(lines, '\n');
+    if (lines.isEmpty()) {
+      return 'No job found for "' + searchText + '".';
+    }
+    return String.join(lines, '\n');
+  }
+
+  /** "Name | location | 3 applicant(s) | due date | jobId: ..." */
+  private static String describe(Job__c job) {
+    String location = 'no location';
+    if (job.Location__c != null) {
+      location = job.Location__c;
+    }
+    String dueDate = 'no due date';
+    if (job.Due_Date__c != null) {
+      dueDate = 'due ' + job.Due_Date__c.format();
+    }
+    Integer applicantCount = job.Job_Applicants__r.size();
+
+    String line = job.Name + ' | ' + location;
+    line += ' | ' + applicantCount + ' applicant(s)';
+    line += ' | ' + dueDate;
+    line += ' | jobId: ' + job.Id;
+    return line;
   }
 }

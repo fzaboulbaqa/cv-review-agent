@@ -46,7 +46,9 @@ export default class CareersJobList extends NavigationMixin(LightningElement) {
   }
 
   async search() {
-    const requestId = ++this.requestId;
+    // Each search gets a number, so an older, slower answer can be recognized and ignored.
+    this.requestId = this.requestId + 1;
+    const requestId = this.requestId;
     this.isLoading = true;
     try {
       const result = await searchJobs({
@@ -83,10 +85,10 @@ export default class CareersJobList extends NavigationMixin(LightningElement) {
 
   handleToggleSection(event) {
     const section = event.currentTarget.dataset.section;
-    this.openSections = {
-      ...this.openSections,
-      [section]: !this.openSections[section]
-    };
+    // Copy the object so the template sees the change.
+    const openSections = { ...this.openSections };
+    openSections[section] = !openSections[section];
+    this.openSections = openSections;
   }
 
   handleLocation(event) {
@@ -109,7 +111,11 @@ export default class CareersJobList extends NavigationMixin(LightningElement) {
 
   handleYears(event) {
     const value = event.target.value;
-    this.years = value === "" || value === null ? undefined : Number(value);
+    if (value === "" || value === null) {
+      this.years = undefined;
+    } else {
+      this.years = Number(value);
+    }
     this.applyFilters();
   }
 
@@ -126,10 +132,12 @@ export default class CareersJobList extends NavigationMixin(LightningElement) {
     this.search();
   }
 
+  /** Adds the value to the list when checked, removes it otherwise (returns a new list). */
   toggle(values, value, checked) {
-    return checked
-      ? [...values, value]
-      : values.filter((item) => item !== value);
+    if (checked) {
+      return [...values, value];
+    }
+    return values.filter((item) => item !== value);
   }
 
   get locationOptions() {
@@ -157,30 +165,42 @@ export default class CareersJobList extends NavigationMixin(LightningElement) {
   }
 
   get sections() {
-    const chevron = (open) => {
-      return open ? "utility:chevronup" : "utility:chevrondown";
-    };
+    let experienceCount = "";
+    if (this.years !== undefined) {
+      experienceCount = "(1)";
+    }
     return {
       location: {
         open: this.openSections.location,
-        icon: chevron(this.openSections.location),
+        icon: this.chevron(this.openSections.location),
         count: this.countLabel(this.selectedLocations)
       },
       skills: {
         open: this.openSections.skills,
-        icon: chevron(this.openSections.skills),
+        icon: this.chevron(this.openSections.skills),
         count: this.countLabel(this.selectedSkills)
       },
       experience: {
         open: this.openSections.experience,
-        icon: chevron(this.openSections.experience),
-        count: this.years === undefined ? "" : "(1)"
+        icon: this.chevron(this.openSections.experience),
+        count: experienceCount
       }
     };
   }
 
+  chevron(open) {
+    if (open) {
+      return "utility:chevronup";
+    }
+    return "utility:chevrondown";
+  }
+
+  /** "(2)" when 2 values are selected, "" when none. */
   countLabel(values) {
-    return values.length ? `(${values.length})` : "";
+    if (values.length > 0) {
+      return `(${values.length})`;
+    }
+    return "";
   }
 
   get hasActiveFilters() {
@@ -195,16 +215,22 @@ export default class CareersJobList extends NavigationMixin(LightningElement) {
   // ---------- Results ----------
 
   get resultLabel() {
-    return `${this.result.total} ${this.result.total === 1 ? "Result" : "Results"}`;
+    const total = this.result.total;
+    if (total === 1) {
+      return "1 Result";
+    }
+    return `${total} Results`;
   }
 
   get jobs() {
-    return this.result.jobs.map((job) => ({
-      ...job,
-      tag: experienceTag(job.minYears),
-      location: job.location || "Location not specified",
-      dueLabel: dueDateLabel(job.dueDate)
-    }));
+    return this.result.jobs.map((job) => {
+      return {
+        ...job,
+        tag: experienceTag(job.minYears),
+        location: job.location || "Location not specified",
+        dueLabel: dueDateLabel(job.dueDate)
+      };
+    });
   }
 
   get isEmpty() {
@@ -223,7 +249,9 @@ export default class CareersJobList extends NavigationMixin(LightningElement) {
   // ---------- Pagination ----------
 
   get totalPages() {
-    return Math.max(1, Math.ceil(this.result.total / this.result.pageSize));
+    const pageCount = Math.ceil(this.result.total / this.result.pageSize);
+    // Always at least one page, even with no results.
+    return Math.max(1, pageCount);
   }
 
   get hasPages() {
@@ -234,9 +262,12 @@ export default class CareersJobList extends NavigationMixin(LightningElement) {
   get pages() {
     const total = this.totalPages;
     const current = this.pageNumber;
-    let numbers;
+    // Step 1: which page numbers to show.
+    let numbers = [];
     if (total <= MAX_PAGE_LINKS) {
-      numbers = Array.from({ length: total }, (_, index) => index + 1);
+      for (let page = 1; page <= total; page++) {
+        numbers.push(page);
+      }
     } else if (current <= 3) {
       numbers = [1, 2, 3, 4, total];
     } else if (current >= total - 2) {
@@ -244,19 +275,29 @@ export default class CareersJobList extends NavigationMixin(LightningElement) {
     } else {
       numbers = [1, current - 1, current, current + 1, total];
     }
+    // Step 2: build the links, with a "..." gap where numbers are skipped.
     const items = [];
-    numbers.forEach((page, index) => {
-      if (index > 0 && page - numbers[index - 1] > 1) {
+    for (let index = 0; index < numbers.length; index++) {
+      const page = numbers[index];
+      const previousPage = numbers[index - 1];
+      if (index > 0 && page - previousPage > 1) {
         items.push({ key: `gap-${page}`, isGap: true });
+      }
+      const isCurrent = page === current;
+      let className = "page";
+      let ariaCurrent = null;
+      if (isCurrent) {
+        className = "page current";
+        ariaCurrent = "page";
       }
       items.push({
         key: `page-${page}`,
         page,
         isGap: false,
-        className: page === current ? "page current" : "page",
-        ariaCurrent: page === current ? "page" : null
+        className,
+        ariaCurrent
       });
-    });
+    }
     return items;
   }
 
@@ -286,8 +327,9 @@ export default class CareersJobList extends NavigationMixin(LightningElement) {
     }
     this.pageNumber = page;
     this.search();
-    this.template
-      .querySelector(".results")
-      ?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+    const results = this.template.querySelector(".results");
+    if (results && results.scrollIntoView) {
+      results.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
   }
 }

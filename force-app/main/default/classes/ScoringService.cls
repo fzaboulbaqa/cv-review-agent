@@ -79,29 +79,63 @@ public with sharing class ScoringService {
    */
   public static List<Breakdown> scoreApplicants(Set<Id> jobIds) {
     try {
-      List<Breakdown> breakdowns = build(
-        [
-          SELECT
-            Id,
-            Job__c,
-            Candidate__c,
-            Score__c,
-            Candidate__r.Years_Experience__c,
-            Job__r.Min_Years_Experience__c
-          FROM Job_Applicant__c
-          WHERE Job__c IN :jobIds AND Score__c = NULL
-          WITH USER_MODE
-        ]
-      );
-      saveScores(breakdowns);
-      return breakdowns;
+      List<Job_Applicant__c> applicants = [
+        SELECT
+          Id,
+          Job__c,
+          Candidate__c,
+          Score__c,
+          Candidate__r.Years_Experience__c,
+          Job__r.Min_Years_Experience__c
+        FROM Job_Applicant__c
+        WHERE Job__c IN :jobIds AND Score__c = NULL
+        WITH USER_MODE
+      ];
+      return scoreAndSave(applicants);
     } catch (Exception ex) {
-      Logger.error('Scoring failed for job(s) ' + jobIds)
-        .setExceptionDetails(ex)
-        .addTag(Constants.LOG_TAG_SCORING);
-      Logger.saveLog();
-      throw new ScoringException('Scoring failed: ' + ex.getMessage(), ex);
+      throw scoringError('job(s) ' + jobIds, ex);
     }
+  }
+
+  /**
+   * Scores and saves the unscored applications of these candidates only. Used once their card
+   * is filled: the other applicants of the same jobs may not have a card yet, and a score is
+   * locked once set, so they must not be scored now.
+   */
+  public static List<Breakdown> scoreCandidates(Set<Id> candidateIds) {
+    try {
+      List<Job_Applicant__c> applicants = [
+        SELECT
+          Id,
+          Job__c,
+          Candidate__c,
+          Score__c,
+          Candidate__r.Years_Experience__c,
+          Job__r.Min_Years_Experience__c
+        FROM Job_Applicant__c
+        WHERE Candidate__c IN :candidateIds AND Score__c = NULL
+        WITH USER_MODE
+      ];
+      return scoreAndSave(applicants);
+    } catch (Exception ex) {
+      throw scoringError('candidate(s) ' + candidateIds, ex);
+    }
+  }
+
+  private static List<Breakdown> scoreAndSave(
+    List<Job_Applicant__c> applicants
+  ) {
+    List<Breakdown> breakdowns = build(applicants);
+    saveScores(breakdowns);
+    return breakdowns;
+  }
+
+  private static ScoringException scoringError(String scope, Exception ex) {
+    Logger.error('Scoring failed for ' + scope)
+      .setExceptionDetails(ex)
+      .addTag(Constants.LOG_TAG_SCORING);
+    Logger.saveLog();
+    return new ScoringException('Scoring failed: ' + ex.getMessage(), ex);
   }
 
   /**
@@ -128,11 +162,8 @@ public with sharing class ScoringService {
       WHERE Job__c = :jobId
       WITH USER_MODE
     ]) {
-      if (
-        candidateIds == null ||
-        candidateIds.isEmpty() ||
-        candidateIds.contains(applicant.Candidate__c)
-      ) {
+      Boolean noFilter = candidateIds == null || candidateIds.isEmpty();
+      if (noFilter || candidateIds.contains(applicant.Candidate__c)) {
         applicants.add(applicant);
       }
     }
@@ -162,10 +193,9 @@ public with sharing class ScoringService {
     for (Breakdown breakdown : breakdowns) {
       breakdown.alreadyScored = true;
     }
-    Logger.info(
-        'Scored ' + updates.size() + ' applicant(s) for job(s) ' + jobIds
-      )
-      .addTag(Constants.LOG_TAG_SCORING);
+    String message = 'Scored ' + updates.size() + ' applicant(s)';
+    message += ' for job(s) ' + jobIds;
+    Logger.info(message).addTag(Constants.LOG_TAG_SCORING);
     Logger.saveLog();
   }
 
@@ -184,9 +214,13 @@ public with sharing class ScoringService {
     Map<Id, Set<Id>> skillIdsByCandidateId = getCandidateSkillIds(candidateIds);
 
     for (Job_Applicant__c applicant : applicants) {
+      List<Job_Skill__c> jobSkills = jobSkillsByJobId.get(applicant.Job__c);
+      Set<Id> candidateSkillIds = skillIdsByCandidateId.get(
+        applicant.Candidate__c
+      );
       Breakdown breakdown = calculate(
-        jobSkillsByJobId.get(applicant.Job__c),
-        skillIdsByCandidateId.get(applicant.Candidate__c),
+        jobSkills,
+        candidateSkillIds,
         applicant.Candidate__r.Years_Experience__c,
         applicant.Job__r.Min_Years_Experience__c
       );
@@ -213,57 +247,74 @@ public with sharing class ScoringService {
     Breakdown breakdown = new Breakdown();
     breakdown.candidateYears = candidateYears;
     breakdown.requiredYears = requiredYears;
-    jobSkills = jobSkills == null ? new List<Job_Skill__c>() : jobSkills;
-    candidateSkillIds = candidateSkillIds == null
-      ? new Set<Id>()
-      : candidateSkillIds;
-
-    for (Job_Skill__c jobSkill : jobSkills) {
-      Boolean matched = candidateSkillIds.contains(jobSkill.Skill__c);
-      if (jobSkill.Importance__c == Constants.IMPORTANCE_MUST_HAVE) {
-        (matched ? breakdown.matchedMustHave : breakdown.missingMustHave)
-          .add(jobSkill.Skill__r.Name);
-      } else {
-        (matched ? breakdown.matchedNiceToHave : breakdown.missingNiceToHave)
-          .add(jobSkill.Skill__r.Name);
-      }
+    if (jobSkills == null) {
+      jobSkills = new List<Job_Skill__c>();
     }
+    if (candidateSkillIds == null) {
+      candidateSkillIds = new Set<Id>();
+    }
+    sortSkills(breakdown, jobSkills, candidateSkillIds);
 
     Decimal earned = 0;
     Decimal possible = 0;
 
-    Integer mustHaveCount =
-      breakdown.matchedMustHave.size() + breakdown.missingMustHave.size();
+    Integer mustHaveMatched = breakdown.matchedMustHave.size();
+    Integer mustHaveCount = mustHaveMatched + breakdown.missingMustHave.size();
     if (mustHaveCount > 0) {
-      earned +=
-        MUST_HAVE_WEIGHT *
-        breakdown.matchedMustHave.size() /
-        mustHaveCount;
+      earned += MUST_HAVE_WEIGHT * mustHaveMatched / mustHaveCount;
       possible += MUST_HAVE_WEIGHT;
     }
 
+    Integer niceToHaveMatched = breakdown.matchedNiceToHave.size();
     Integer niceToHaveCount =
-      breakdown.matchedNiceToHave.size() + breakdown.missingNiceToHave.size();
+      niceToHaveMatched + breakdown.missingNiceToHave.size();
     if (niceToHaveCount > 0) {
-      earned +=
-        NICE_TO_HAVE_WEIGHT *
-        breakdown.matchedNiceToHave.size() /
-        niceToHaveCount;
+      earned += NICE_TO_HAVE_WEIGHT * niceToHaveMatched / niceToHaveCount;
       possible += NICE_TO_HAVE_WEIGHT;
     }
 
     if (requiredYears != null && requiredYears > 0) {
       // Unknown years earn nothing: the AI reasoning should flag it as a gap to check.
-      Decimal years = candidateYears == null ? 0 : candidateYears;
-      earned += EXPERIENCE_WEIGHT * Math.min(years / requiredYears, 1);
+      Decimal years = 0;
+      if (candidateYears != null) {
+        years = candidateYears;
+      }
+      Decimal experienceRatio = Math.min(years / requiredYears, 1);
+      earned += EXPERIENCE_WEIGHT * experienceRatio;
       possible += EXPERIENCE_WEIGHT;
     }
 
     // No criteria defined on the job: nothing to measure against.
-    breakdown.score = possible == 0
-      ? 0
-      : (earned / possible * 100).round(System.RoundingMode.HALF_UP).intValue();
+    if (possible == 0) {
+      breakdown.score = 0;
+      return breakdown;
+    }
+    Decimal percent = earned / possible * 100;
+    breakdown.score = percent.round(System.RoundingMode.HALF_UP).intValue();
     return breakdown;
+  }
+
+  /** Puts each job skill in the matched or missing list (must-have or nice-to-have). */
+  private static void sortSkills(
+    Breakdown breakdown,
+    List<Job_Skill__c> jobSkills,
+    Set<Id> candidateSkillIds
+  ) {
+    for (Job_Skill__c jobSkill : jobSkills) {
+      String skillName = jobSkill.Skill__r.Name;
+      Boolean matched = candidateSkillIds.contains(jobSkill.Skill__c);
+      Boolean mustHave =
+        jobSkill.Importance__c == Constants.IMPORTANCE_MUST_HAVE;
+      if (mustHave && matched) {
+        breakdown.matchedMustHave.add(skillName);
+      } else if (mustHave) {
+        breakdown.missingMustHave.add(skillName);
+      } else if (matched) {
+        breakdown.matchedNiceToHave.add(skillName);
+      } else {
+        breakdown.missingNiceToHave.add(skillName);
+      }
+    }
   }
 
   private static Map<Id, List<Job_Skill__c>> getJobSkills(Set<Id> jobIds) {

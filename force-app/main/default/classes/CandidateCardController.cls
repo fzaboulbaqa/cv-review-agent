@@ -92,35 +92,49 @@ public with sharing class CandidateCardController {
       WHERE Id IN :candidateIds
       WITH USER_MODE
     ]) {
-      Card card = new Card();
-      card.candidateId = candidate.Id;
-      card.name = candidate.Name;
-      card.currentTitle = candidate.Current_Title__c;
-      card.country = candidate.Country__c;
-      card.yearsExperience = candidate.Years_Experience__c;
-      card.photoUrl = photoUrl(candidate.Photo_Version_Id__c);
-      cards.put(candidate.Id, card);
+      cards.put(candidate.Id, newCard(candidate));
     }
     if (cards.isEmpty()) {
       return cards;
     }
+    addSkills(cards);
+    addFlags(cards);
+    return cards;
+  }
 
-    Set<Id> foundIds = cards.keySet();
+  private static Card newCard(Candidate__c candidate) {
+    Card card = new Card();
+    card.candidateId = candidate.Id;
+    card.name = candidate.Name;
+    card.currentTitle = candidate.Current_Title__c;
+    card.country = candidate.Country__c;
+    card.yearsExperience = candidate.Years_Experience__c;
+    card.photoUrl = photoUrl(candidate.Photo_Version_Id__c);
+    return card;
+  }
+
+  /** Adds the skill names to each card, in alphabetical order. */
+  private static void addSkills(Map<Id, Card> cards) {
+    Set<Id> candidateIds = cards.keySet();
     for (Candidate_Skill__c candidateSkill : [
       SELECT Candidate__c, Skill__r.Name
       FROM Candidate_Skill__c
-      WHERE Candidate__c IN :foundIds
+      WHERE Candidate__c IN :candidateIds
       WITH USER_MODE
       ORDER BY Skill__r.Name
     ]) {
-      cards.get(candidateSkill.Candidate__c)
-        .skills.add(candidateSkill.Skill__r.Name);
+      Card card = cards.get(candidateSkill.Candidate__c);
+      card.skills.add(candidateSkill.Skill__r.Name);
     }
+  }
 
+  /** Adds the extraction flags to each card and counts them by type. */
+  private static void addFlags(Map<Id, Card> cards) {
+    Set<Id> candidateIds = cards.keySet();
     for (Extraction_Flag__c row : [
       SELECT Id, Candidate__c, Type__c, Field__c, Detail__c
       FROM Extraction_Flag__c
-      WHERE Candidate__c IN :foundIds
+      WHERE Candidate__c IN :candidateIds
       WITH USER_MODE
       ORDER BY Type__c, Field__c
     ]) {
@@ -139,7 +153,6 @@ public with sharing class CandidateCardController {
         card.conflictCount++;
       }
     }
-    return cards;
   }
 
   /**
@@ -162,21 +175,12 @@ public with sharing class CandidateCardController {
       }
       ContentVersion version = versions[0];
 
-      Integer links = [
-        SELECT COUNT()
-        FROM ContentDocumentLink
-        WHERE
-          ContentDocumentId = :version.ContentDocumentId
-          AND LinkedEntityId = :candidateId
-        WITH USER_MODE
-      ];
-      if (links == 0) {
+      if (!isAttached(version.ContentDocumentId, candidateId)) {
         throw auraError('The file is not attached to this candidate.');
       }
       PhotoResult result = new PhotoResult();
-      if (
-        !Constants.IMAGE_EXTENSIONS.contains(version.FileType?.toLowerCase())
-      ) {
+      String fileType = version.FileType?.toLowerCase();
+      if (!Constants.IMAGE_EXTENSIONS.contains(fileType)) {
         delete as user new ContentDocument(Id = version.ContentDocumentId);
         result.error = 'The photo must be a PNG, JPG, GIF or WEBP image.';
         return result;
@@ -212,9 +216,22 @@ public with sharing class CandidateCardController {
 
   /** URL that renders a ContentVersion image for internal users. Null when there is no photo. */
   public static String photoUrl(String contentVersionId) {
-    return String.isBlank(contentVersionId)
-      ? null
-      : '/sfc/servlet.shepherd/version/download/' + contentVersionId;
+    if (String.isBlank(contentVersionId)) {
+      return null;
+    }
+    return '/sfc/servlet.shepherd/version/download/' + contentVersionId;
+  }
+
+  private static Boolean isAttached(Id contentDocumentId, Id candidateId) {
+    Integer links = [
+      SELECT COUNT()
+      FROM ContentDocumentLink
+      WHERE
+        ContentDocumentId = :contentDocumentId
+        AND LinkedEntityId = :candidateId
+      WITH USER_MODE
+    ];
+    return links > 0;
   }
 
   /** Best effort: the user may not own the old file. Failures are logged, not shown. */
@@ -234,15 +251,18 @@ public with sharing class CandidateCardController {
     if (previous.isEmpty() || previous[0].ContentDocumentId == newDocumentId) {
       return;
     }
+    ContentDocument oldFile = new ContentDocument(
+      Id = previous[0].ContentDocumentId
+    );
+    Boolean allOrNone = false;
     Database.DeleteResult result = Database.delete(
-      new ContentDocument(Id = previous[0].ContentDocumentId),
-      false,
+      oldFile,
+      allOrNone,
       AccessLevel.USER_MODE
     );
     if (!result.isSuccess()) {
-      Logger.warn(
-          'Previous photo not deleted: ' + result.getErrors()[0].getMessage()
-        )
+      String error = result.getErrors()[0].getMessage();
+      Logger.warn('Previous photo not deleted: ' + error)
         .addTag(Constants.LOG_TAG_CANDIDATE_CARD);
     }
   }

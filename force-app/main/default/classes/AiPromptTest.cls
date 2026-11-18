@@ -82,4 +82,21 @@ private class AiPromptTest {
       AiPrompt.fileInput(documentId)
     );
   }
+
+  @IsTest
+  static void readsEveryNumberType() {
+    Map<String, Object> data = new Map<String, Object>{
+      'decimal' => 1.5,
+      'integer' => 2,
+      'long' => 3L,
+      'double' => Double.valueOf(4.5),
+      'missing' => null
+    };
+    Assert.areEqual(1.5, AiPrompt.num(data, 'decimal'));
+    Assert.areEqual(2, AiPrompt.num(data, 'integer'));
+    Assert.areEqual(3, AiPrompt.num(data, 'long'));
+    Assert.areEqual(4.5, AiPrompt.num(data, 'double'));
+    Assert.isNull(AiPrompt.num(data, 'missing'));
+    Assert.isNull(AiPrompt.num(null, 'decimal'));
+  }
 }

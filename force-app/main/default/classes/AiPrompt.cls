@@ -43,10 +43,11 @@ public with sharing class AiPrompt {
     while (!lines.isEmpty() && isCourtesy(lines[lines.size() - 1])) {
       lines.remove(lines.size() - 1);
     }
+    String result = String.join(lines, '\n');
     // Also a closing "Thank you ..." sentence at the end of the last line.
-    return String.join(lines, '\n')
-      .replaceAll('(?i)\\s*(thank you|thanks for)[^.!\\n]*[.!]?\\s*$', '')
-      .trim();
+    String closingThanks = '(?i)\\s*(thank you|thanks for)[^.!\\n]*[.!]?\\s*$';
+    result = result.replaceAll(closingThanks, '');
+    return result.trim();
   }
 
   private static Boolean isCourtesy(String line) {
@@ -66,15 +67,18 @@ public with sharing class AiPrompt {
    * sentence around it: everything outside the outer braces is ignored.
    */
   public static Map<String, Object> parseJsonObject(String text) {
-    Integer start = text == null ? -1 : text.indexOf('{');
-    Integer finish = text == null ? -1 : text.lastIndexOf('}');
+    Integer start = -1;
+    Integer finish = -1;
+    if (text != null) {
+      start = text.indexOf('{');
+      finish = text.lastIndexOf('}');
+    }
     if (start < 0 || finish <= start) {
       throw new AiException('The AI answer is not JSON.');
     }
+    String jsonText = text.substring(start, finish + 1);
     try {
-      return (Map<String, Object>) JSON.deserializeUntyped(
-        text.substring(start, finish + 1)
-      );
+      return (Map<String, Object>) JSON.deserializeUntyped(jsonText);
     } catch (Exception ex) {
       throw new AiException(
         'The AI answer is not valid JSON: ' + ex.getMessage()
@@ -85,18 +89,21 @@ public with sharing class AiPrompt {
   // ---------- Safe readers for untyped JSON (the AI may return any type) ----------
 
   public static String text(Map<String, Object> data, String key) {
-    Object value = data == null ? null : data.get(key);
+    Object value = rawValue(data, key);
     if (value == null) {
       return null;
     }
     String result = String.valueOf(value).trim();
     // Models sometimes write "null" or "N/A" instead of leaving the value out.
     Set<String> empty = new Set<String>{ '', 'null', 'n/a', 'none', 'unknown' };
-    return empty.contains(result.toLowerCase()) ? null : result;
+    if (empty.contains(result.toLowerCase())) {
+      return null;
+    }
+    return result;
   }
 
   public static Decimal num(Map<String, Object> data, String key) {
-    Object value = data == null ? null : data.get(key);
+    Object value = rawValue(data, key);
     if (value instanceof Decimal) {
       return (Decimal) value;
     }
@@ -109,17 +116,19 @@ public with sharing class AiPrompt {
     if (value instanceof Double) {
       return Decimal.valueOf((Double) value);
     }
+    if (value == null) {
+      return null;
+    }
+    // A number written as text, e.g. "5.5".
     try {
-      return value == null
-        ? null
-        : Decimal.valueOf(String.valueOf(value).trim());
+      return Decimal.valueOf(String.valueOf(value).trim());
     } catch (TypeException ex) {
       return null;
     }
   }
 
   public static Boolean bool(Map<String, Object> data, String key) {
-    Object value = data == null ? null : data.get(key);
+    Object value = rawValue(data, key);
     return value == true || String.valueOf(value)?.toLowerCase() == 'true';
   }
 
@@ -128,7 +137,7 @@ public with sharing class AiPrompt {
     String key
   ) {
     List<Map<String, Object>> result = new List<Map<String, Object>>();
-    Object value = data == null ? null : data.get(key);
+    Object value = rawValue(data, key);
     if (value instanceof List<Object>) {
       for (Object item : (List<Object>) value) {
         if (item instanceof Map<String, Object>) {
@@ -137,6 +146,14 @@ public with sharing class AiPrompt {
       }
     }
     return result;
+  }
+
+  /** The value of the key, or null when there is no data. */
+  private static Object rawValue(Map<String, Object> data, String key) {
+    if (data == null) {
+      return null;
+    }
+    return data.get(key);
   }
 
   /** Einstein implementation (Prompt Builder through Connect API). */

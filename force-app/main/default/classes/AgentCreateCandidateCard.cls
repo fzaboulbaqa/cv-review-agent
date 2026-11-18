@@ -52,11 +52,13 @@ public with sharing class AgentCreateCandidateCard {
             'Which candidate? Give me a candidate or a job.'
           );
         }
-        result.message = summarize(
-          candidateIds.isEmpty()
-            ? CvExtractionService.fillJobApplicants(jobId)
-            : CvExtractionService.fillCards(candidateIds)
-        );
+        CvExtractionService.FillResult fillResult;
+        if (candidateIds.isEmpty()) {
+          fillResult = CvExtractionService.fillJobApplicants(jobId);
+        } else {
+          fillResult = CvExtractionService.fillCards(candidateIds);
+        }
+        result.message = summarize(fillResult);
       } catch (Exception ex) {
         result.message = AgentInputs.failure('Create Candidate Card', ex);
       }
@@ -86,8 +88,9 @@ public with sharing class AgentCreateCandidateCard {
           'Name them to read their CV again.'
       );
     }
-    return lines.isEmpty()
-      ? 'This job has no applicants yet.'
-      : String.join(lines, '\n');
+    if (lines.isEmpty()) {
+      return 'This job has no applicants yet.';
+    }
+    return String.join(lines, '\n');
   }
 }

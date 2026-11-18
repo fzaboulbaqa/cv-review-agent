@@ -17,11 +17,11 @@
         </expectation>
         <expectation>
             <expectedValue
-      >The agent reports the card of Karim El Fassi: fields filled, skills added, and the missing, inferred and conflicting values. It does not show record ids.</expectedValue>
+      >The agent reports the card of Sofia Rossi: fields filled, skills added, and the missing, inferred and conflicting values. It does not show record ids.</expectedValue>
             <name>bot_response_rating</name>
         </expectation>
         <inputs>
-            <utterance>Create the candidate card of Karim El Fassi</utterance>
+            <utterance>Create the candidate card of Sofia Rossi</utterance>
         </inputs>
         <number>1</number>
     </testCase>
@@ -37,12 +37,12 @@
         </expectation>
         <expectation>
             <expectedValue
-      >The agent quotes the CV (10 years stated) and mentions that the job dates give fewer years. It does not invent anything.</expectedValue>
+      >The agent quotes the CV (8 years stated) and mentions that the job dates give fewer years. It does not invent anything.</expectedValue>
             <name>bot_response_rating</name>
         </expectation>
         <inputs>
             <utterance
-      >What does Karim El Fassi&apos;s CV say about his years of experience?</utterance>
+      >What does Claire Dubois&apos;s CV say about her years of experience?</utterance>
         </inputs>
         <number>2</number>
     </testCase>
@@ -58,12 +58,12 @@
         </expectation>
         <expectation>
             <expectedValue
-      >The agent names the applicants whose CV mentions Docker, with a quote, and says there is no evidence for the others.</expectedValue>
+      >The agent names the applicants whose CV mentions Prompt Builder, with a quote, and says there is no evidence for the others.</expectedValue>
             <name>bot_response_rating</name>
         </expectation>
         <inputs>
             <utterance
-      >Who has worked with Docker among the applicants of the Senior Salesforce Developer job?</utterance>
+      >Who has used Prompt Builder among the applicants of the Senior Salesforce Developer - Agentforce job?</utterance>
         </inputs>
         <number>3</number>
     </testCase>
@@ -84,7 +84,7 @@
         </expectation>
         <inputs>
             <utterance
-      >Compare the applicants for the Senior Salesforce Developer job</utterance>
+      >Compare the applicants for the Senior Salesforce Developer - Agentforce job</utterance>
         </inputs>
         <number>4</number>
     </testCase>
@@ -105,7 +105,7 @@
         </expectation>
         <inputs>
             <utterance
-      >Compare the applicants for the Data Analyst job</utterance>
+      >Compare the applicants for the AI Data Engineer job</utterance>
         </inputs>
         <number>5</number>
     </testCase>

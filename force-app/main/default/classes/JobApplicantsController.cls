@@ -24,14 +24,14 @@ public with sharing class JobApplicantsController {
     Integer pageSize,
     Integer offsetSize
   ) {
-    Integer safePageSize = pageSize == null ||
-      pageSize < 1
-      ? 1
-      : Math.min(pageSize, MAX_PAGE_SIZE);
-    Integer safeOffset = offsetSize == null ||
-      offsetSize < 0
-      ? 0
-      : Math.min(offsetSize, MAX_OFFSET);
+    Integer safePageSize = 1;
+    if (pageSize != null && pageSize >= 1) {
+      safePageSize = Math.min(pageSize, MAX_PAGE_SIZE);
+    }
+    Integer safeOffset = 0;
+    if (offsetSize != null && offsetSize >= 0) {
+      safeOffset = Math.min(offsetSize, MAX_OFFSET);
+    }
     try {
       ApplicantPage page = new ApplicantPage();
       page.total = [

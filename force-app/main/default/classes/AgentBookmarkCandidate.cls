@@ -56,32 +56,37 @@ public with sharing class AgentBookmarkCandidate {
             'This application was not found.'
           );
         }
+        Job_Applicant__c applicant = applicants[0];
+
+        String notes = null;
+        if (request.notes != null) {
+          notes = request.notes.left(32768);
+        }
+        Map<String, Object> flowInputs = new Map<String, Object>{
+          'jobApplicantId' => applicantId,
+          'notes' => notes
+        };
         Flow.Interview.Create_Bookmark interview = new Flow.Interview.Create_Bookmark(
-          new Map<String, Object>{
-            'jobApplicantId' => applicantId,
-            'notes' => request.notes == null ? null : request.notes.left(32768)
-          }
+          flowInputs
         );
         interview.start();
         result.bookmarkId = (String) interview.getVariableValue('bookmarkId');
         Boolean already =
           interview.getVariableValue('alreadyBookmarked') == true;
-        String who =
-          applicants[0].Candidate__r.Name +
-          ' for ' +
-          applicants[0].Job__r.Name;
-        result.message = already
-          ? 'You had already bookmarked ' +
-            who +
-            ' (bookmarkId: ' +
-            result.bookmarkId +
-            '). Your notes were not changed: edit them on the bookmark.'
-          : 'Bookmarked ' +
-            who +
-            ' (score ' +
-            applicants[0].Score__c +
-            '). bookmarkId: ' +
-            result.bookmarkId;
+
+        String who = applicant.Candidate__r.Name;
+        who += ' for ' + applicant.Job__r.Name;
+        String message;
+        if (already) {
+          message = 'You had already bookmarked ' + who;
+          message += ' (bookmarkId: ' + result.bookmarkId + ').';
+          message += ' Your notes were not changed: edit them on the bookmark.';
+        } else {
+          message = 'Bookmarked ' + who;
+          message += ' (score ' + applicant.Score__c + ').';
+          message += ' bookmarkId: ' + result.bookmarkId;
+        }
+        result.message = message;
         Logger.info('Agent decision: ' + result.message)
           .addTag(Constants.LOG_TAG_AGENT_DECISION);
         Logger.saveLog();

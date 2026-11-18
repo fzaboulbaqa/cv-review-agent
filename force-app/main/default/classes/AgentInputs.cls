@@ -12,11 +12,15 @@ public with sharing class AgentInputs {
   public static Id toId(String value, SObjectType type, String label) {
     Id result = parse(value);
     if (result == null || result.getSObjectType() != type) {
+      String received = '';
+      if (value != null) {
+        received = value.left(40);
+      }
       throw new InputException(
         'I need the ' +
           label +
           ' record id (got "' +
-          (value == null ? '' : value.left(40)) +
+          received +
           '"). Find it first with the search action.'
       );
     }
@@ -25,7 +29,10 @@ public with sharing class AgentInputs {
 
   /** Optional id: null when empty. */
   public static Id toOptionalId(String value, SObjectType type, String label) {
-    return String.isBlank(value) ? null : toId(value, type, label);
+    if (String.isBlank(value)) {
+      return null;
+    }
+    return toId(value, type, label);
   }
 
   /** Ids separated by commas, spaces or new lines. Empty input gives an empty list. */
@@ -58,8 +65,11 @@ public with sharing class AgentInputs {
   }
 
   private static Id parse(String value) {
+    if (String.isBlank(value)) {
+      return null;
+    }
     try {
-      return String.isBlank(value) ? null : Id.valueOf(value.trim());
+      return Id.valueOf(value.trim());
     } catch (Exception ex) {
       return null;
     }

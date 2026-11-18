@@ -72,11 +72,10 @@ public with sharing class CareersController {
         '(Due_Date__c = NULL OR Due_Date__c >= :today)'
       };
 
-      String likeKeyword = String.isBlank(keyword)
-        ? null
-        : '%' + escapeLike(keyword.trim()) + '%';
+      String likeKeyword = null;
       Set<Id> keywordSkillJobIds = new Set<Id>();
-      if (likeKeyword != null) {
+      if (String.isNotBlank(keyword)) {
+        likeKeyword = '%' + escapeLike(keyword.trim()) + '%';
         // A semi-join can't be combined with OR, so the skill match is a separate query.
         for (Job_Skill__c jobSkill : [
           SELECT Job__c
@@ -109,7 +108,10 @@ public with sharing class CareersController {
         );
       }
 
-      Integer page = pageNumber == null || pageNumber < 1 ? 1 : pageNumber;
+      Integer page = 1;
+      if (pageNumber != null && pageNumber > 1) {
+        page = pageNumber;
+      }
       Integer offsetSize = Math.min((page - 1) * PAGE_SIZE, MAX_OFFSET);
       Integer pageSize = PAGE_SIZE;
       Map<String, Object> binds = new Map<String, Object>{
@@ -125,21 +127,24 @@ public with sharing class CareersController {
       // Only fixed condition strings are joined: every user value is a bind variable.
       String whereClause = ' WHERE ' + String.join(conditions, ' AND ');
 
+      String countQuery = 'SELECT COUNT() FROM Job__c' + whereClause;
+      String jobsQuery =
+        'SELECT Id, Name, Location__c, Min_Years_Experience__c, Due_Date__c FROM Job__c' +
+        whereClause +
+        ' ORDER BY Due_Date__c ASC NULLS LAST, Name ASC LIMIT :pageSize OFFSET :offsetSize';
+
       JobPage result = new JobPage();
       result.total = Database.countQueryWithBinds(
-        'SELECT COUNT() FROM Job__c' + whereClause,
+        countQuery,
         binds,
         AccessLevel.USER_MODE
       );
-      for (
-        Job__c job : (List<Job__c>) Database.queryWithBinds(
-          'SELECT Id, Name, Location__c, Min_Years_Experience__c, Due_Date__c FROM Job__c' +
-            whereClause +
-            ' ORDER BY Due_Date__c ASC NULLS LAST, Name ASC LIMIT :pageSize OFFSET :offsetSize',
-          binds,
-          AccessLevel.USER_MODE
-        )
-      ) {
+      List<Job__c> jobs = (List<Job__c>) Database.queryWithBinds(
+        jobsQuery,
+        binds,
+        AccessLevel.USER_MODE
+      );
+      for (Job__c job : jobs) {
         result.jobs.add(toSummary(job));
       }
       return result;
@@ -208,14 +213,17 @@ public with sharing class CareersController {
       if (jobs.isEmpty()) {
         throw auraError('This job is no longer open.');
       }
+      Job__c job = jobs[0];
       JobDetail detail = new JobDetail();
-      detail.job = toSummary(jobs[0]);
-      detail.description = jobs[0].Description__c;
-      for (Job_Skill__c jobSkill : jobs[0].Job_Skills__r) {
-        (jobSkill.Importance__c == Constants.IMPORTANCE_MUST_HAVE
-            ? detail.mustHaveSkills
-            : detail.niceToHaveSkills)
-          .add(jobSkill.Skill__r.Name);
+      detail.job = toSummary(job);
+      detail.description = job.Description__c;
+      for (Job_Skill__c jobSkill : job.Job_Skills__r) {
+        String skillName = jobSkill.Skill__r.Name;
+        if (jobSkill.Importance__c == Constants.IMPORTANCE_MUST_HAVE) {
+          detail.mustHaveSkills.add(skillName);
+        } else {
+          detail.niceToHaveSkills.add(skillName);
+        }
       }
       return detail;
     } catch (AuraHandledException ex) {

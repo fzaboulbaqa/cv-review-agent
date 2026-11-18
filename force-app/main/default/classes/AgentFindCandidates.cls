@@ -42,9 +42,11 @@ public with sharing class AgentFindCandidates {
           Job__c.SObjectType,
           'job'
         );
-        result.message = jobId == null
-          ? search(request.searchText)
-          : applicants(jobId, request.searchText);
+        if (jobId == null) {
+          result.message = search(request.searchText);
+        } else {
+          result.message = applicants(jobId, request.searchText);
+        }
       } catch (Exception ex) {
         result.message = AgentInputs.failure('Find Candidates', ex);
       }
@@ -84,15 +86,18 @@ public with sharing class AgentFindCandidates {
     ]) {
       lines.add(describe(candidate) + ' | candidateId: ' + candidate.Id);
     }
-    return lines.isEmpty()
-      ? 'No candidate found for "' + searchText + '".'
-      : String.join(lines, '\n');
+    if (lines.isEmpty()) {
+      return 'No candidate found for "' + searchText + '".';
+    }
+    return String.join(lines, '\n');
   }
 
   private static String applicants(Id jobId, String searchText) {
-    String pattern = String.isBlank(searchText)
-      ? '%'
-      : '%' + searchText.trim() + '%';
+    // No search text: every applicant of the job.
+    String pattern = '%';
+    if (String.isNotBlank(searchText)) {
+      pattern = '%' + searchText.trim() + '%';
+    }
     List<String> lines = new List<String>();
     for (Job_Applicant__c applicant : [
       SELECT
@@ -109,36 +114,34 @@ public with sharing class AgentFindCandidates {
       ORDER BY Score__c DESC NULLS LAST, Candidate__r.Name
       LIMIT :MAX_RESULTS
     ]) {
-      lines.add(
-        describe(applicant.Candidate__r) +
-          ' | score: ' +
-          (applicant.Score__c == null
-            ? 'not scored'
-            : String.valueOf(applicant.Score__c.intValue())) +
-          ' | candidateId: ' +
-          applicant.Candidate__c +
-          ' | applicantId: ' +
-          applicant.Id
-      );
+      String score = 'not scored';
+      if (applicant.Score__c != null) {
+        score = String.valueOf(applicant.Score__c.intValue());
+      }
+      String line = describe(applicant.Candidate__r) + ' | score: ' + score;
+      line += ' | candidateId: ' + applicant.Candidate__c;
+      line += ' | applicantId: ' + applicant.Id;
+      lines.add(line);
     }
-    return lines.isEmpty()
-      ? 'This job has no matching applicants.'
-      : String.join(lines, '\n');
+    if (lines.isEmpty()) {
+      return 'This job has no matching applicants.';
+    }
+    return String.join(lines, '\n');
   }
 
   private static String describe(Candidate__c candidate) {
-    return candidate.Name +
-      ' | ' +
-      (candidate.Current_Title__c == null
-        ? 'title not found in CV'
-        : candidate.Current_Title__c) +
-      ' | ' +
-      (candidate.Years_Experience__c == null
-        ? 'years not found in CV'
-        : candidate.Years_Experience__c + ' years') +
-      ' | ' +
-      (candidate.Country__c == null
-        ? 'country not found'
-        : candidate.Country__c);
+    String title = 'title not found in CV';
+    if (candidate.Current_Title__c != null) {
+      title = candidate.Current_Title__c;
+    }
+    String years = 'years not found in CV';
+    if (candidate.Years_Experience__c != null) {
+      years = candidate.Years_Experience__c + ' years';
+    }
+    String country = 'country not found';
+    if (candidate.Country__c != null) {
+      country = candidate.Country__c;
+    }
+    return candidate.Name + ' | ' + title + ' | ' + years + ' | ' + country;
   }
 }
